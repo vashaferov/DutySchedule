@@ -318,34 +318,23 @@
 </head>
 <body>
   <div class="container">
-    <!-- Шапка -->
     <div class="header">
       <h1>📅 График дежурств</h1>
       <span class="badge">макс. 2 человека</span>
     </div>
-
-    <!-- Информация -->
     <div class="info">
       <span>ℹ️</span>
-      <span>
-        <strong>Клик</strong> по ячейке — добавить/убрать дежурного.
-        Когда выбрано <strong>2</strong> человека, остальные блокируются.
-      </span>
+      <span><strong>Клик</strong> по ячейке — добавить/убрать дежурного. Когда выбрано <strong>2</strong> человека, остальные блокируются.</span>
     </div>
-
-    <!-- Таблица -->
     <div id="loading" class="table-wrapper">
-      <div style="padding:20px; text-align:center;">
-        <span class="spinner"></span> Загрузка...
-      </div>
+      <div style="padding:20px; text-align:center;"><span class="spinner"></span> Загрузка...</div>
     </div>
     <div id="table-container" style="display:none;"></div>
   </div>
 
   <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbyUtlDVyQ0SeO52VSvCtL4bhpTRZzkgz-BsLF3viYQymJvopQZHPw26euzm_Ng8njg/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbx3fPMDq9bUslOUin7egr06tEK08dBaiCkKtEBdQ35j9NEGUtPB4hoc9NUIXTfrMw/exec';
 
-    // ---------- Загрузка данных ----------
     async function loadData() {
       const loading = document.getElementById('loading');
       const container = document.getElementById('table-container');
@@ -353,9 +342,7 @@
         const resp = await fetch(API_URL);
         if (!resp.ok) throw new Error('Ошибка загрузки');
         const data = await resp.json();
-        // Проверка на ошибку от скрипта
         if (data.error) throw new Error(data.error);
-
         renderTable(data);
         loading.style.display = 'none';
         container.style.display = 'block';
@@ -365,11 +352,9 @@
       }
     }
 
-    // ---------- Рендер таблицы ----------
     function renderTable(data) {
       const { dates, names, matrix } = data;
       const container = document.getElementById('table-container');
-
       let html = `
         <div class="table-wrapper">
           <table>
@@ -381,19 +366,13 @@
             </thead>
             <tbody>
       `;
-
       for (let i = 0; i < dates.length; i++) {
         const dateStr = dates[i];
         const row = matrix[i] || [];
         const checkedCount = row.filter(v => v === true).length;
-
-        // Прогресс
         const percent = Math.min((checkedCount / 2) * 100, 100);
         const fillClass = checkedCount === 2 ? 'full' : '';
-
         html += `<tr data-date="${dateStr}" data-count="${checkedCount}">`;
-
-        // Ячейка с датой + прогресс
         html += `
           <td>
             <div class="date-cell">
@@ -407,14 +386,11 @@
             </div>
           </td>
         `;
-
-        // Ячейки с именами
         for (let j = 0; j < names.length; j++) {
           const checked = row[j] === true;
           const name = names[j];
           const cellClass = checked ? 'cell selected' : 'cell';
           const display = checked ? '✔' : '•';
-          // data-атрибуты для обработчиков
           html += `
             <td>
               <span class="${cellClass}" 
@@ -426,28 +402,16 @@
             </td>
           `;
         }
-
         html += '</tr>';
       }
-
-      html += `
-            </tbody>
-          </table>
-        </div>
-      `;
-
+      html += `</tbody></table></div>`;
       container.innerHTML = html;
-
-      // Применяем начальное состояние блокировок
       updateRowStates();
-
-      // Вешаем обработчики на все ячейки
       document.querySelectorAll('.cell').forEach(cell => {
         cell.addEventListener('click', toggleCell);
       });
     }
 
-    // ---------- Форматирование даты ----------
     function formatDate(date) {
       if (typeof date === 'string') {
         const d = new Date(date);
@@ -465,63 +429,39 @@
       return String(date);
     }
 
-    // ---------- Обновление состояния строк (блокировки + прогресс) ----------
     function updateRowStates() {
       const rows = document.querySelectorAll('tbody tr');
       rows.forEach(tr => {
         const cells = tr.querySelectorAll('.cell');
         let checkedCount = 0;
-
-        // Считаем выбранные
         cells.forEach(cell => {
           if (cell.dataset.checked === 'true') checkedCount++;
         });
-
-        // Обновляем прогресс в первой ячейке
         const progressFill = tr.querySelector('.progress-fill');
         const countSpan = tr.querySelector('.progress-wrapper span');
         if (progressFill) {
           const percent = Math.min((checkedCount / 2) * 100, 100);
           progressFill.style.width = percent + '%';
-          if (checkedCount === 2) {
-            progressFill.classList.add('full');
-          } else {
-            progressFill.classList.remove('full');
-          }
+          if (checkedCount === 2) progressFill.classList.add('full');
+          else progressFill.classList.remove('full');
         }
-        if (countSpan) {
-          countSpan.textContent = `${checkedCount}/2`;
-        }
-
-        // Подсветка строки
-        if (checkedCount === 2) {
-          tr.classList.add('row-full');
-        } else {
-          tr.classList.remove('row-full');
-        }
-
-        // Блокировка ячеек
+        if (countSpan) countSpan.textContent = `${checkedCount}/2`;
+        if (checkedCount === 2) tr.classList.add('row-full');
+        else tr.classList.remove('row-full');
         if (checkedCount >= 2) {
           cells.forEach(cell => {
-            if (cell.dataset.checked !== 'true') {
-              cell.classList.add('disabled');
-            } else {
-              cell.classList.remove('disabled');
-            }
+            if (cell.dataset.checked !== 'true') cell.classList.add('disabled');
+            else cell.classList.remove('disabled');
           });
         } else {
-          cells.forEach(cell => {
-            cell.classList.remove('disabled');
-          });
+          cells.forEach(cell => cell.classList.remove('disabled'));
         }
       });
     }
 
-    // ---------- Обработчик клика по ячейке ----------
+    // ---------- ИСПРАВЛЕННАЯ ОТПРАВКА ----------
     async function toggleCell(event) {
       const cell = event.currentTarget;
-
-      // Если заблокирована — игнорируем
       if (cell.classList.contains('disabled')) return;
 
       const date = cell.dataset.date;
@@ -529,42 +469,40 @@
       const currentChecked = cell.dataset.checked === 'true';
       const newValue = !currentChecked;
 
-      // Оптимистичное обновление UI
+      // Оптимистичное обновление
       cell.dataset.checked = String(newValue);
       cell.textContent = newValue ? '✔' : '•';
-      if (newValue) {
-        cell.classList.add('selected');
-      } else {
-        cell.classList.remove('selected');
-      }
-
-      // Пересчитываем состояние строк (прогресс, блокировки)
+      newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
       updateRowStates();
 
-      // Отправка на сервер (без ожидания ответа из-за no-cors)
+      // Отправка через URL-encoded (простой запрос, без CORS-проблем)
       try {
+        const params = new URLSearchParams();
+        params.append('date', date);
+        params.append('name', name);
+        params.append('value', String(newValue)); // 'true' или 'false'
+
         await fetch(API_URL, {
           method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date, name, value: newValue })
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+          // mode: 'cors' по умолчанию — подходит
         });
+        // Ответ не обрабатываем, т.к. из-за CORS мы не можем его прочитать,
+        // но запрос всё равно выполняется.
       } catch (e) {
-        // Ошибка — откатываем
         alert('Ошибка сохранения. Попробуйте ещё раз.');
+        // Откат
         cell.dataset.checked = String(currentChecked);
         cell.textContent = currentChecked ? '✔' : '•';
-        if (currentChecked) {
-          cell.classList.add('selected');
-        } else {
-          cell.classList.remove('selected');
-        }
+        currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
         updateRowStates();
         console.error(e);
       }
     }
 
-    // Запуск
     loadData();
   </script>
 </body>
