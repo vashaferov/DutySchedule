@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>График дежурств</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #999; padding: 8px 12px; text-align: center; min-width: 70px; }
+    th { background: #f2f2f2; }
+    td:first-child { font-weight: bold; background: #fafafa; }
+    .available { background-color: #b6f7b6; cursor: pointer; }
+    .unavailable { background-color: #fff; cursor: pointer; }
+    .available:hover { background-color: #8ae08a; }
+    .unavailable:hover { background-color: #f0f0f0; }
+    #loading { margin: 20px 0; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>📅 График дежурств</h1>
+  <p>Кликните по ячейке, чтобы переключить доступность</p>
+  <div id="loading">Загрузка...</div>
+  <div id="table-container"></div>
+
+  <script>
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxOe0h_euT-wNzayR7R2myVkiMwnyIsZ1YQCXJuA2oG2u-kP8VnjsqX4pkGGeqXoU4/exec';
+
+    async function loadData() {
+      try {
+        const resp = await fetch(API_URL);
+        const data = await resp.json();
+        renderTable(data);
+        document.getElementById('loading').style.display = 'none';
+      } catch (e) {
+        document.getElementById('loading').textContent = '❌ Ошибка загрузки. Проверьте интернет и URL.';
+        console.error(e);
+      }
+    }
+
+    function renderTable(data) {
+      const { dates, names, matrix } = data;
+      const container = document.getElementById('table-container');
+      let html = '<table><thead><tr><th>Дата</th>';
+      names.forEach(name => html += `<th>${name}</th>`);
+      html += '</tr></thead><tbody>';
+
+      for (let i = 0; i < dates.length; i++) {
+        html += `<tr><td>${formatDate(dates[i])}</td>`;
+        for (let j = 0; j < names.length; j++) {
+          const checked = matrix[i] && matrix[i][j] === true;
+          const cls = checked ? 'available' : 'unavailable';
+          const display = checked ? '✔' : ' ';
+          html += `<td class="${cls}" data-date="${dates[i]}" data-name="${names[j]}" data-checked="${checked}">${display}</td>`;
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+
+      // Добавляем обработчики кликов
+      document.querySelectorAll('td[data-date]').forEach(cell => {
+        cell.addEventListener('click', toggleCell);
+      });
+    }
+
+    function formatDate(date) {
+      // Если приходит строка – оставляем, если объект Date – форматируем
+      if (typeof date === 'string') return date;
+      if (date instanceof Date) {
+        const d = date.getDate().toString().padStart(2,'0');
+        const m = (date.getMonth()+1).toString().padStart(2,'0');
+        const y = date.getFullYear();
+        return `${d}.${m}.${y}`;
+      }
+      return String(date);
+    }
+
+    async function toggleCell(event) {
+      const cell = event.currentTarget;
+      const date = cell.dataset.date;
+      const name = cell.dataset.name;
+      const currentChecked = cell.dataset.checked === 'true';
+      const newValue = !currentChecked;
+
+      // Оптимистичное обновление UI
+      cell.dataset.checked = String(newValue);
+      cell.textContent = newValue ? '✔' : ' ';
+      cell.className = newValue ? 'available' : 'unavailable';
+
+      // Отправляем на сервер
+      try {
+        const resp = await fetch(API_URL, {
+          method: 'POST',
+          mode: 'no-cors', // важно для анонимного доступа
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date, name, value: newValue })
+        });
+        // При no-cors ответ недоступен, но запрос уходит
+        // Можно добавить повторную загрузку для синхронизации (но это редко нужно)
+      } catch (e) {
+        alert('Ошибка сохранения. Попробуйте ещё раз.');
+        // Откатываем UI
+        cell.dataset.checked = String(currentChecked);
+        cell.textContent = currentChecked ? '✔' : ' ';
+        cell.className = currentChecked ? 'available' : 'unavailable';
+        console.error(e);
+      }
+    }
+
+    // Загружаем данные при старте
+    loadData();
+  </script>
+</body>
+</html>
