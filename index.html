@@ -65,16 +65,25 @@
     }
 
     function formatDate(date) {
-      // Если приходит строка – оставляем, если объект Date – форматируем
-      if (typeof date === 'string') return date;
-      if (date instanceof Date) {
-        const d = date.getDate().toString().padStart(2,'0');
-        const m = (date.getMonth()+1).toString().padStart(2,'0');
-        const y = date.getFullYear();
-        return `${d}.${m}.${y}`;
-      }
-      return String(date);
-    }
+	  // Если пришла строка, пытаемся распарсить её как дату
+	  if (typeof date === 'string') {
+		// Пробуем создать Date из строки
+		const d = new Date(date);
+		if (!isNaN(d)) {
+		  // Если получился валидный Date, форматируем
+		  return `${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
+		}
+		return date;
+	  }
+	  if (date instanceof Date) {
+		const d = date.getDate().toString().padStart(2,'0');
+		const m = (date.getMonth()+1).toString().padStart(2,'0');
+		const y = date.getFullYear();
+		return `${d}.${m}.${y}`;
+	  }
+
+	  return String(date);
+	}
 
     async function toggleCell(event) {
       const cell = event.currentTarget;
