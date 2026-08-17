@@ -442,3 +442,78 @@ tbody tr.row-full td:first-child .progress-fill {
 .stats-total .value {
     color: #4338ca;
 }
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+}
+
+.stats-card {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+    transition: transform 0.2s;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+}
+
+.stats-card .name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.stats-card .value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #4f46e5;
+    display: block;
+}
+
+.stats-card .label {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.stats-total {
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+}
+
+.stats-total .value {
+    color: #4338ca;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.progress-fill-stat {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    background: #4f46e5;
+}
+
+.progress-fill-stat.green {
+    background: #22c55e;
+}
+
+.progress-fill-stat.yellow {
+    background: #eab308;
+}

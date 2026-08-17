@@ -57,6 +57,10 @@
       <span class="count" id="stats-count"></span>
     </div>
     <div id="stats-container" class="stats-grid"></div>
+    <div id="chart-container"
+      style="margin-top:24px; background:#fff; border-radius:20px; padding:20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+      <canvas id="chartCanvas" width="800" height="300" style="width:100%; height:auto; max-width:100%;"></canvas>
+    </div>
   </div>
 
   <!-- Подключаем конфиг -->
@@ -338,61 +342,96 @@
       }
     }
 
-    // ---------- Статистика ----------
+    // ---------- Статистика + график ----------
     function renderStats() {
       const section = document.getElementById('stats-section');
       const container = document.getElementById('stats-container');
+      const canvas = document.getElementById('chartCanvas');
 
       if (!allDates.length) {
         section.style.display = 'none';
         return;
       }
 
-      // Получаем имена (из первого элемента)
       const names = allDates[0].names;
-      // Считаем сумму отметок по каждому имени
       const totals = {};
       names.forEach(name => totals[name] = 0);
 
+      // Собираем данные по датам для графика
+      const dates = [];
+      const countsPerDate = [];
+
       allDates.forEach(item => {
         const row = item.matrixRow;
+        let cnt = 0;
         for (let i = 0; i < names.length; i++) {
-          if (row[i] === true) totals[names[i]]++;
+          if (row[i] === true) {
+            totals[names[i]]++;
+            cnt++;
+          }
         }
+        dates.push(item.dateStr);
+        countsPerDate.push(cnt);
       });
 
-      // Общее количество дат
-      const totalDates = allDates.length;
-      // Среднее количество дежурных на дату
       const totalMarks = Object.values(totals).reduce((a, b) => a + b, 0);
+      const totalDates = allDates.length;
       const avg = (totalMarks / totalDates).toFixed(1);
+      const maxVal = Math.max(...Object.values(totals));
+      const minVal = Math.min(...Object.values(totals));
+      const maxName = Object.keys(totals).find(k => totals[k] === maxVal);
+      const minName = Object.keys(totals).find(k => totals[k] === minVal);
 
-      // Строим HTML
+      // Строим карточки
       let html = '';
-      // Карточка "Всего дат"
+      // Всего дат
       html += `
     <div class="stats-card stats-total">
       <div class="name">Всего дат</div>
-      <div class="value">${totalDates}</div>
+      <span class="value">${totalDates}</span>
       <div class="label">включая архив</div>
     </div>
   `;
-      // Карточка "Среднее"
+      // Среднее
       html += `
     <div class="stats-card stats-total">
       <div class="name">Среднее дежурных</div>
-      <div class="value">${avg}</div>
+      <span class="value">${avg}</span>
       <div class="label">на дату</div>
     </div>
   `;
-      // Карточки по каждому человеку
+      // Максимум
+      html += `
+    <div class="stats-card stats-total">
+      <div class="name">Максимум</div>
+      <span class="value">${maxVal}</span>
+      <div class="label">${maxName}</div>
+    </div>
+  `;
+      // Минимум
+      html += `
+    <div class="stats-card stats-total">
+      <div class="name">Минимум</div>
+      <span class="value">${minVal}</span>
+      <div class="label">${minName}</div>
+    </div>
+  `;
+
+      // Карточки по сотрудникам с прогресс-баром
       names.forEach(name => {
         const count = totals[name] || 0;
+        const percent = maxVal > 0 ? (count / maxVal) * 100 : 0;
+        let colorClass = '';
+        if (percent >= 80) colorClass = 'green';
+        else if (percent >= 50) colorClass = 'yellow';
         html += `
       <div class="stats-card">
         <div class="name">${name}</div>
-        <div class="value">${count}</div>
+        <span class="value">${count}</span>
         <div class="label">дежурств</div>
+        <div class="progress-bar">
+          <div class="progress-fill-stat ${colorClass}" style="width:${percent}%;"></div>
+        </div>
       </div>
     `;
       });
@@ -400,6 +439,105 @@
       container.innerHTML = html;
       section.style.display = 'block';
       document.getElementById('stats-count').textContent = `(${names.length} чел.)`;
+
+      // --- Отрисовка графика ---
+      drawChart(canvas, dates, countsPerDate, names.length);
+    }
+
+    // ---------- Функция рисования гистограммы ----------
+    function drawChart(canvas, labels, data, maxPossible) {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      // Устанавливаем размер canvas с учётом DPI (для чёткости)
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const containerWidth = rect.width || 800;
+      const height = 300;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = containerWidth * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = containerWidth + 'px';
+      canvas.style.height = height + 'px';
+      ctx.scale(dpr, dpr);
+
+      const w = containerWidth;
+      const h = height;
+      const padding = { top: 30, bottom: 40, left: 40, right: 20 };
+      const chartW = w - padding.left - padding.right;
+      const chartH = h - padding.top - padding.bottom;
+
+      // Если данных нет
+      if (!labels.length) {
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#64748b';
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Нет данных для графика', w / 2, h / 2);
+        return;
+      }
+
+      const maxVal = Math.max(...data, 1);
+      const stepX = chartW / labels.length;
+      const barWidth = Math.min(stepX * 0.6, 40);
+
+      // Очищаем
+      ctx.clearRect(0, 0, w, h);
+
+      // Оси
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, padding.top + chartH);
+      ctx.lineTo(padding.left + chartW, padding.top + chartH);
+      ctx.stroke();
+
+      // Подписи оси X (даты)
+      ctx.fillStyle = '#475569';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const maxLabels = Math.min(labels.length, 20); // если много, показываем не все
+      const stepLabel = Math.max(1, Math.floor(labels.length / maxLabels));
+      for (let i = 0; i < labels.length; i += stepLabel) {
+        const x = padding.left + i * stepX + stepX / 2;
+        ctx.fillText(labels[i].slice(0, 10), x, padding.top + chartH + 6);
+      }
+
+      // Ось Y (количество)
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      const ySteps = 5;
+      for (let i = 0; i <= ySteps; i++) {
+        const val = Math.round((i / ySteps) * maxVal);
+        const y = padding.top + chartH - (i / ySteps) * chartH;
+        ctx.fillText(val, padding.left - 6, y);
+        // горизонтальные линии
+        ctx.strokeStyle = '#f1f5f9';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + chartW, y);
+        ctx.stroke();
+      }
+
+      // Столбцы
+      for (let i = 0; i < data.length; i++) {
+        const x = padding.left + i * stepX + (stepX - barWidth) / 2;
+        const barH = (data[i] / maxVal) * chartH;
+        const y = padding.top + chartH - barH;
+        // Цвет: если заполнено максимальное количество (2) – зелёный, иначе синий
+        const isFull = data[i] === 2;
+        ctx.fillStyle = isFull ? '#22c55e' : '#4f46e5';
+        ctx.fillRect(x, y, barWidth, barH);
+        // Подпись значения
+        if (data[i] > 0) {
+          ctx.fillStyle = '#1e293b';
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(data[i], x + barWidth / 2, y - 2);
+        }
+      }
     }
 
     // Запуск
