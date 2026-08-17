@@ -59,7 +59,8 @@
     <div id="stats-container" class="stats-grid"></div>
     <div id="chart-container"
       style="margin-top:24px; background:#fff; border-radius:20px; padding:20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
-      <canvas id="chartCanvas" width="800" height="300" style="width:100%; height:auto; max-width:100%;"></canvas>
+      <canvas id="chartCanvas" width="400" height="400"
+        style="width:100%; max-width:400px; height:auto; display:block; margin:0 auto;"></canvas>
     </div>
   </div>
 
@@ -342,7 +343,7 @@
       }
     }
 
-    // ---------- Статистика + график ----------
+    // ---------- Статистика + круговая диаграмма ----------
     function renderStats() {
       const section = document.getElementById('stats-section');
       const container = document.getElementById('stats-container');
@@ -357,21 +358,12 @@
       const totals = {};
       names.forEach(name => totals[name] = 0);
 
-      // Собираем данные по датам для графика
-      const dates = [];
-      const countsPerDate = [];
-
+      // Подсчёт дежурств по всем датам
       allDates.forEach(item => {
         const row = item.matrixRow;
-        let cnt = 0;
         for (let i = 0; i < names.length; i++) {
-          if (row[i] === true) {
-            totals[names[i]]++;
-            cnt++;
-          }
+          if (row[i] === true) totals[names[i]]++;
         }
-        dates.push(item.dateStr);
-        countsPerDate.push(cnt);
       });
 
       const totalMarks = Object.values(totals).reduce((a, b) => a + b, 0);
@@ -382,38 +374,13 @@
       const maxName = Object.keys(totals).find(k => totals[k] === maxVal);
       const minName = Object.keys(totals).find(k => totals[k] === minVal);
 
-      // Строим карточки
+      // Строим карточки (общая статистика)
       let html = '';
-      // Всего дат
-      html += `
-    <div class="stats-card stats-total">
-      <div class="name">Всего дат</div>
-      <span class="value">${totalDates}</span>
-      <div class="label">включая архив</div>
-    </div>
-  `;
-      // Среднее
-      html += `
-    <div class="stats-card stats-total">
-      <div class="name">Среднее дежурных</div>
-      <span class="value">${avg}</span>
-      <div class="label">на дату</div>
-    </div>
-  `;
-      // Максимум
       html += `
     <div class="stats-card stats-total">
       <div class="name">Максимум</div>
       <span class="value">${maxVal}</span>
       <div class="label">${maxName}</div>
-    </div>
-  `;
-      // Минимум
-      html += `
-    <div class="stats-card stats-total">
-      <div class="name">Минимум</div>
-      <span class="value">${minVal}</span>
-      <div class="label">${minName}</div>
     </div>
   `;
 
@@ -440,104 +407,113 @@
       section.style.display = 'block';
       document.getElementById('stats-count').textContent = `(${names.length} чел.)`;
 
-      // --- Отрисовка графика ---
-      drawChart(canvas, dates, countsPerDate, names.length);
+      // --- Рисуем круговую диаграмму ---
+      drawPieChart(canvas, names, totals);
     }
 
-    // ---------- Функция рисования гистограммы ----------
-    function drawChart(canvas, labels, data, maxPossible) {
+    // ---------- Круговая диаграмма ----------
+    function drawPieChart(canvas, labels, data) {
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
-      // Устанавливаем размер canvas с учётом DPI (для чёткости)
-      const rect = canvas.parentElement.getBoundingClientRect();
-      const containerWidth = rect.width || 800;
-      const height = 300;
+      const values = labels.map(name => data[name] || 0);
+      const total = values.reduce((a, b) => a + b, 0);
+
+      // Устанавливаем размер canvas с учётом DPI для чёткости
+      const container = canvas.parentElement;
+      const containerWidth = container.clientWidth || 400;
+      const size = Math.min(containerWidth, 400);
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = containerWidth * dpr;
-      canvas.height = height * dpr;
-      canvas.style.width = containerWidth + 'px';
-      canvas.style.height = height + 'px';
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      canvas.style.width = size + 'px';
+      canvas.style.height = size + 'px';
       ctx.scale(dpr, dpr);
 
-      const w = containerWidth;
-      const h = height;
-      const padding = { top: 30, bottom: 40, left: 40, right: 20 };
-      const chartW = w - padding.left - padding.right;
-      const chartH = h - padding.top - padding.bottom;
+      const cx = size / 2;
+      const cy = size / 2;
+      const radius = Math.min(size * 0.38, 180);
 
-      // Если данных нет
-      if (!labels.length) {
-        ctx.clearRect(0, 0, w, h);
+      ctx.clearRect(0, 0, size, size);
+
+      if (total === 0) {
         ctx.fillStyle = '#64748b';
         ctx.font = '16px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Нет данных для графика', w / 2, h / 2);
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Нет дежурств', cx, cy);
         return;
       }
 
-      const maxVal = Math.max(...data, 1);
-      const stepX = chartW / labels.length;
-      const barWidth = Math.min(stepX * 0.6, 40);
+      // Цветовая палитра
+      const colors = [
+        '#4f46e5', '#22c55e', '#eab308', '#ef4444', '#8b5cf6',
+        '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+        '#06b6d4', '#d946ef', '#f59e0b', '#10b981', '#3b82f6'
+      ];
 
-      // Очищаем
-      ctx.clearRect(0, 0, w, h);
+      let startAngle = -Math.PI / 2; // начинаем с 12 часов
+      const legendItems = [];
 
-      // Оси
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(padding.left, padding.top);
-      ctx.lineTo(padding.left, padding.top + chartH);
-      ctx.lineTo(padding.left + chartW, padding.top + chartH);
-      ctx.stroke();
+      for (let i = 0; i < labels.length; i++) {
+        const val = values[i];
+        if (val === 0) continue;
+        const sliceAngle = (val / total) * 2 * Math.PI;
+        const endAngle = startAngle + sliceAngle;
+        const color = colors[i % colors.length];
 
-      // Подписи оси X (даты)
-      ctx.fillStyle = '#475569';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      const maxLabels = Math.min(labels.length, 20); // если много, показываем не все
-      const stepLabel = Math.max(1, Math.floor(labels.length / maxLabels));
-      for (let i = 0; i < labels.length; i += stepLabel) {
-        const x = padding.left + i * stepX + stepX / 2;
-        ctx.fillText(labels[i].slice(0, 10), x, padding.top + chartH + 6);
-      }
-
-      // Ось Y (количество)
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
-      const ySteps = 5;
-      for (let i = 0; i <= ySteps; i++) {
-        const val = Math.round((i / ySteps) * maxVal);
-        const y = padding.top + chartH - (i / ySteps) * chartH;
-        ctx.fillText(val, padding.left - 6, y);
-        // горизонтальные линии
-        ctx.strokeStyle = '#f1f5f9';
-        ctx.lineWidth = 1;
+        // Рисуем сектор
         ctx.beginPath();
-        ctx.moveTo(padding.left, y);
-        ctx.lineTo(padding.left + chartW, y);
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
         ctx.stroke();
+
+        // Процент
+        const percent = ((val / total) * 100).toFixed(1);
+        const midAngle = startAngle + sliceAngle / 2;
+        const labelRadius = radius * 0.7;
+        const x = cx + Math.cos(midAngle) * labelRadius;
+        const y = cy + Math.sin(midAngle) * labelRadius;
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(percent + '%', x, y);
+
+        // Сохраняем для легенды
+        legendItems.push({ label: labels[i], color, value: val, percent });
+
+        startAngle = endAngle;
       }
 
-      // Столбцы
-      for (let i = 0; i < data.length; i++) {
-        const x = padding.left + i * stepX + (stepX - barWidth) / 2;
-        const barH = (data[i] / maxVal) * chartH;
-        const y = padding.top + chartH - barH;
-        // Цвет: если заполнено максимальное количество (2) – зелёный, иначе синий
-        const isFull = data[i] === 2;
-        ctx.fillStyle = isFull ? '#22c55e' : '#4f46e5';
-        ctx.fillRect(x, y, barWidth, barH);
-        // Подпись значения
-        if (data[i] > 0) {
-          ctx.fillStyle = '#1e293b';
-          ctx.font = '10px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(data[i], x + barWidth / 2, y - 2);
-        }
-      }
+      // Рисуем легенду под диаграммой
+      const legendContainer = document.getElementById('chart-container');
+      let legendHTML = '<div class="legend">';
+      legendItems.forEach(item => {
+        legendHTML += `
+      <div class="legend-item">
+        <span class="legend-color" style="background:${item.color};"></span>
+        ${item.label} (${item.value} — ${item.percent}%)
+      </div>
+    `;
+      });
+      legendHTML += '</div>';
+      // Удаляем старую легенду, если есть
+      const oldLegend = legendContainer.querySelector('.legend');
+      if (oldLegend) oldLegend.remove();
+      // Вставляем после canvas
+      legendContainer.appendChild(createElementFromHTML(legendHTML));
+    }
+
+    // Вспомогательная функция для создания DOM из строки HTML
+    function createElementFromHTML(htmlString) {
+      const div = document.createElement('div');
+      div.innerHTML = htmlString.trim();
+      return div.firstElementChild;
     }
 
     // Запуск
