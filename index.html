@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>График дежурств</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <div class="container">
     <!-- Шапка -->
@@ -48,16 +50,20 @@
     </div>
   </div>
 
+  <!-- Статистика -->
+  <div id="stats-section" class="section" style="display:none;">
+    <div class="section-title">
+      📊 Статистика дежурств
+      <span class="count" id="stats-count"></span>
+    </div>
+    <div id="stats-container" class="stats-grid"></div>
+  </div>
+
   <!-- Подключаем конфиг -->
   <script src="config.js"></script>
 
   <!-- Основной скрипт -->
   <script>
-    // Используем глобальные переменные из config.js
-    // API_URL, PAGE_SIZE, MAX_PER_DAY определены в config.js
-
-    // Обновляем элементы интерфейса с максимальным числом
-    // document.getElementById('max-badge').textContent = MAX_PER_DAY;
     document.getElementById('max-info').textContent = MAX_PER_DAY;
 
     let allDates = [];
@@ -112,6 +118,7 @@
 
         renderMainTable();
         renderArchiveTable();
+        renderStats();
         updateCounts();
 
       } catch (e) {
@@ -331,8 +338,73 @@
       }
     }
 
+    // ---------- Статистика ----------
+    function renderStats() {
+      const section = document.getElementById('stats-section');
+      const container = document.getElementById('stats-container');
+
+      if (!allDates.length) {
+        section.style.display = 'none';
+        return;
+      }
+
+      // Получаем имена (из первого элемента)
+      const names = allDates[0].names;
+      // Считаем сумму отметок по каждому имени
+      const totals = {};
+      names.forEach(name => totals[name] = 0);
+
+      allDates.forEach(item => {
+        const row = item.matrixRow;
+        for (let i = 0; i < names.length; i++) {
+          if (row[i] === true) totals[names[i]]++;
+        }
+      });
+
+      // Общее количество дат
+      const totalDates = allDates.length;
+      // Среднее количество дежурных на дату
+      const totalMarks = Object.values(totals).reduce((a, b) => a + b, 0);
+      const avg = (totalMarks / totalDates).toFixed(1);
+
+      // Строим HTML
+      let html = '';
+      // Карточка "Всего дат"
+      html += `
+    <div class="stats-card stats-total">
+      <div class="name">Всего дат</div>
+      <div class="value">${totalDates}</div>
+      <div class="label">включая архив</div>
+    </div>
+  `;
+      // Карточка "Среднее"
+      html += `
+    <div class="stats-card stats-total">
+      <div class="name">Среднее дежурных</div>
+      <div class="value">${avg}</div>
+      <div class="label">на дату</div>
+    </div>
+  `;
+      // Карточки по каждому человеку
+      names.forEach(name => {
+        const count = totals[name] || 0;
+        html += `
+      <div class="stats-card">
+        <div class="name">${name}</div>
+        <div class="value">${count}</div>
+        <div class="label">дежурств</div>
+      </div>
+    `;
+      });
+
+      container.innerHTML = html;
+      section.style.display = 'block';
+      document.getElementById('stats-count').textContent = `(${names.length} чел.)`;
+    }
+
     // Запуск
     loadData();
   </script>
 </body>
+
 </html>
