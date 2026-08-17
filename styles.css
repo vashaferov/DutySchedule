@@ -1,9 +1,5 @@
 /* ---------- Базовые сбросы и шрифты ---------- */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
@@ -64,16 +60,10 @@ body {
   gap: 8px;
   flex-wrap: wrap;
 }
-
-.info strong {
-  font-weight: 600;
-}
+.info strong { font-weight: 600; }
 
 /* ---------- Секции ---------- */
-.section {
-  margin-bottom: 32px;
-}
-
+.section { margin-bottom: 32px; }
 .section-title {
   font-size: 1.25rem;
   font-weight: 600;
@@ -84,18 +74,17 @@ body {
   gap: 10px;
   flex-wrap: wrap;
 }
-
 .section-title .count {
   font-size: 0.9rem;
   font-weight: 400;
   color: #64748b;
 }
 
-/* ---------- Таблицы (исправлен скролл) ---------- */
+/* ---------- Таблицы (гарантированный скролл) ---------- */
 .table-wrapper {
   background: #ffffff;
   border-radius: 20px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding: 2px 0;
@@ -103,8 +92,8 @@ body {
 }
 
 table {
-  width: auto;          /* не растягивается на всю ширину */
-  min-width: 600px;     /* заставляет скролл на мобильных */
+  width: auto;
+  min-width: 600px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.95rem;
@@ -122,16 +111,12 @@ thead th {
   letter-spacing: 0.3px;
   white-space: nowrap;
 }
-
 thead th:first-child {
   border-top-left-radius: 20px;
   text-align: left;
   padding-left: 20px;
 }
-
-thead th:last-child {
-  border-top-right-radius: 20px;
-}
+thead th:last-child { border-top-right-radius: 20px; }
 
 tbody td {
   padding: 12px 8px;
@@ -140,7 +125,6 @@ tbody td {
   background: #ffffff;
   border-bottom: 1px solid #f1f5f9;
 }
-
 tbody td:first-child {
   text-align: left;
   padding-left: 20px;
@@ -149,19 +133,13 @@ tbody td:first-child {
   background: #fafcff;
 }
 
-/* Ячейка с датой + прогресс */
 .date-cell {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 80px;
 }
-
-.date-text {
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
+.date-text { font-weight: 600; font-size: 0.9rem; }
 .progress-wrapper {
   display: flex;
   align-items: center;
@@ -169,7 +147,6 @@ tbody td:first-child {
   font-size: 0.7rem;
   color: #64748b;
 }
-
 .progress-bar {
   flex: 1;
   height: 4px;
@@ -178,7 +155,6 @@ tbody td:first-child {
   overflow: hidden;
   min-width: 30px;
 }
-
 .progress-fill {
   height: 100%;
   background: #4f46e5;
@@ -186,12 +162,8 @@ tbody td:first-child {
   transition: width 0.3s ease;
   width: 0%;
 }
+.progress-fill.full { background: #22c55e; }
 
-.progress-fill.full {
-  background: #22c55e;
-}
-
-/* Ячейки с именами (квадратные) */
 .cell {
   display: inline-flex;
   align-items: center;
@@ -208,25 +180,21 @@ tbody td:first-child {
   background: #f1f5f9;
   color: #94a3b8;
 }
-
 .cell.selected {
   background: #dbeafe;
   border-color: #4f46e5;
   color: #4f46e5;
-  box-shadow: 0 4px 6px -2px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 4px 6px -2px rgba(79,70,229,0.2);
 }
-
 .cell.selected:hover {
   background: #c7d2fe;
   transform: scale(1.05);
 }
-
 .cell:not(.selected):not(.disabled):hover {
   background: #e2e8f0;
   transform: scale(1.05);
   border-color: #cbd5e1;
 }
-
 .cell.disabled {
   background: #f1f5f9;
   color: #cbd5e1;
@@ -235,7 +203,6 @@ tbody td:first-child {
   border-color: transparent;
   pointer-events: none;
 }
-
 .cell.archive-cell {
   background: #f8fafc;
   color: #94a3b8;
@@ -243,23 +210,16 @@ tbody td:first-child {
   border-color: #e2e8f0;
   pointer-events: none;
 }
-
-/* Подсветка строки, когда заполнены 2 */
 tbody tr.row-full td:first-child {
   background: #f0fdf4;
 }
-
 tbody tr.row-full td:first-child .date-text {
   color: #16a34a;
 }
-
 tbody tr.row-full td:first-child .progress-fill {
   background: #22c55e;
 }
-
-.cell:active:not(.disabled) {
-  transform: scale(0.92);
-}
+.cell:active:not(.disabled) { transform: scale(0.92); }
 
 /* ---------- Пагинация ---------- */
 .pagination {
@@ -271,7 +231,6 @@ tbody tr.row-full td:first-child .progress-fill {
   padding: 8px 0;
   flex-wrap: wrap;
 }
-
 .pagination button {
   background: #e2e8f0;
   border: none;
@@ -285,20 +244,12 @@ tbody tr.row-full td:first-child .progress-fill {
   min-height: 44px;
   min-width: 44px;
 }
-
-.pagination button:hover:not(:disabled) {
-  background: #cbd5e1;
-}
-
+.pagination button:hover:not(:disabled) { background: #cbd5e1; }
 .pagination button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-
-.pagination span {
-  font-size: 0.95rem;
-  color: #475569;
-}
+.pagination span { font-size: 0.95rem; color: #475569; }
 
 /* ---------- Архив ---------- */
 .archive-table .cell {
@@ -307,18 +258,15 @@ tbody tr.row-full td:first-child .progress-fill {
   color: #94a3b8;
   border-color: #e2e8f0;
 }
-
 .archive-table .cell.selected {
   background: #e2e8f0;
   border-color: #94a3b8;
   color: #64748b;
   box-shadow: none;
 }
-
 .archive-table tr.row-full td:first-child {
   background: #f1f5f9;
 }
-
 .archive-table tr.row-full td:first-child .date-text {
   color: #64748b;
 }
@@ -326,55 +274,48 @@ tbody tr.row-full td:first-child .progress-fill {
 /* ---------- Статистика (улучшенная адаптация) ---------- */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
   background: #ffffff;
   border-radius: 20px;
-  padding: 20px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
 }
 
 .stats-card {
   background: #f8fafc;
   border-radius: 12px;
-  padding: 14px 12px;
+  padding: 12px 8px;
   text-align: center;
   transition: transform 0.2s;
 }
-
-.stats-card:hover {
-  transform: translateY(-2px);
-}
+.stats-card:hover { transform: translateY(-2px); }
 
 .stats-card .name {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #1e293b;
   margin-bottom: 4px;
+  word-break: break-word;
+  hyphens: auto;
 }
-
 .stats-card .value {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   font-weight: 700;
   color: #4f46e5;
   display: block;
   line-height: 1.2;
 }
-
 .stats-card .label {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #64748b;
   margin-top: 2px;
 }
-
 .stats-total {
   background: #eef2ff;
   border: 1px solid #c7d2fe;
 }
-
-.stats-total .value {
-  color: #4338ca;
-}
+.stats-total .value { color: #4338ca; }
 
 .progress-bar {
   width: 100%;
@@ -384,21 +325,14 @@ tbody tr.row-full td:first-child .progress-fill {
   margin-top: 8px;
   overflow: hidden;
 }
-
 .progress-fill-stat {
   height: 100%;
   border-radius: 4px;
   transition: width 0.6s ease;
   background: #4f46e5;
 }
-
-.progress-fill-stat.green {
-  background: #22c55e;
-}
-
-.progress-fill-stat.yellow {
-  background: #eab308;
-}
+.progress-fill-stat.green { background: #22c55e; }
+.progress-fill-stat.yellow { background: #eab308; }
 
 /* ---------- График (круговая) ---------- */
 .chart-wrapper {
@@ -406,18 +340,16 @@ tbody tr.row-full td:first-child .progress-fill {
   background: #ffffff;
   border-radius: 20px;
   padding: 20px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-
 #chartCanvas {
   max-width: 100%;
   height: auto;
   display: block;
 }
-
 .legend {
   display: flex;
   flex-wrap: wrap;
@@ -426,13 +358,11 @@ tbody tr.row-full td:first-child .progress-fill {
   margin-top: 16px;
   font-size: 0.85rem;
 }
-
 .legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-
 .legend-color {
   width: 14px;
   height: 14px;
@@ -447,7 +377,6 @@ tbody tr.row-full td:first-child .progress-fill {
   color: #64748b;
   font-size: 1rem;
 }
-
 .spinner {
   display: inline-block;
   width: 24px;
@@ -459,14 +388,9 @@ tbody tr.row-full td:first-child .progress-fill {
   margin-right: 10px;
   vertical-align: middle;
 }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------- Адаптивность ---------- */
-
-/* Планшеты и маленькие ноутбуки */
 @media (max-width: 1024px) {
   body { padding: 20px 12px; }
   .container { max-width: 100%; }
@@ -475,13 +399,12 @@ tbody tr.row-full td:first-child .progress-fill {
   thead th, tbody td { padding: 10px 6px; }
   .date-cell { min-width: 60px; }
   .stats-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 12px;
-    padding: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    padding: 14px;
   }
 }
 
-/* Мобильные телефоны (до 640px) */
 @media (max-width: 640px) {
   body { padding: 12px 6px; }
   .header h1 { font-size: 1.3rem; }
@@ -491,12 +414,12 @@ tbody tr.row-full td:first-child .progress-fill {
   .table-wrapper {
     border-radius: 14px;
     padding: 0;
-    overflow-x: auto;   /* принудительный скролл */
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
   table {
     font-size: 0.75rem;
-    min-width: 420px;    /* таблица уже экрана → скролл */
+    min-width: 420px;
   }
   thead th { padding: 8px 4px; font-size: 0.65rem; }
   tbody td { padding: 8px 4px; }
@@ -505,8 +428,7 @@ tbody tr.row-full td:first-child .progress-fill {
   .date-text { font-size: 0.75rem; }
   .progress-wrapper { font-size: 0.6rem; gap: 4px; }
   .progress-bar { min-width: 20px; height: 3px; }
-  
-  /* Статистика в две колонки */
+
   .stats-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
@@ -517,7 +439,7 @@ tbody tr.row-full td:first-child .progress-fill {
   .stats-card .label { font-size: 0.6rem; }
   .stats-card { padding: 10px 8px; }
   .progress-bar { height: 4px; margin-top: 4px; }
-  
+
   .pagination button { padding: 6px 14px; font-size: 0.8rem; min-height: 36px; min-width: 36px; }
   .pagination span { font-size: 0.8rem; }
   .chart-wrapper { padding: 12px; margin-top: 16px; }
@@ -526,10 +448,9 @@ tbody tr.row-full td:first-child .progress-fill {
   #loading { padding: 20px; font-size: 0.9rem; }
 }
 
-/* Очень маленькие экраны (до 400px) */
 @media (max-width: 400px) {
   .stats-grid {
-    grid-template-columns: 1fr 1fr; /* остаётся две колонки */
+    grid-template-columns: 1fr 1fr;
     gap: 6px;
     padding: 8px;
   }
@@ -537,7 +458,7 @@ tbody tr.row-full td:first-child .progress-fill {
   .stats-card .value { font-size: 1rem; }
   .stats-card .name { font-size: 0.65rem; }
   .stats-card .label { font-size: 0.5rem; }
-  
+
   table { min-width: 320px; font-size: 0.7rem; }
   .cell { width: 24px; height: 24px; font-size: 0.7rem; }
   thead th, tbody td { padding: 6px 2px; }

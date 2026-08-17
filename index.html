@@ -48,17 +48,17 @@
       </div>
       <div id="archive-table-container" class="archive-table"></div>
     </div>
-  </div>
 
-  <!-- Статистика -->
-  <div id="stats-section" class="section" style="display:none;">
-    <div class="section-title">
-      📊 Статистика дежурств
-      <span class="count" id="stats-count"></span>
-    </div>
-    <div id="stats-container" class="stats-grid"></div>
-    <div id="chart-container" class="chart-wrapper">
-      <canvas id="chartCanvas" width="400" height="400"></canvas>
+    <!-- Статистика -->
+    <div id="stats-section" class="section" style="display:none;">
+      <div class="section-title">
+        📊 Статистика дежурств
+        <span class="count" id="stats-count"></span>
+      </div>
+      <div id="stats-container" class="stats-grid"></div>
+      <div id="chart-container" class="chart-wrapper">
+        <canvas id="chartCanvas" width="400" height="400"></canvas>
+      </div>
     </div>
   </div>
 
@@ -196,15 +196,16 @@
       if (!items || items.length === 0) return '';
       const names = items[0].names;
       let html = `
-        <table>
-          <thead>
-            <tr>
-              <th>Дата</th>
-              ${names.map(name => `<th>${name}</th>`).join('')}
-            </tr>
-          </thead>
-          <tbody>
-      `;
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Дата</th>
+            ${names.map(name => `<th>${name}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+  `;
 
       items.forEach(item => {
         const dateStr = item.dateStr;
@@ -215,18 +216,18 @@
 
         html += `<tr data-date="${dateStr}">`;
         html += `
-          <td>
-            <div class="date-cell">
-              <span class="date-text">${formatDateDisplay(dateStr)}</span>
-              <div class="progress-wrapper">
-                <span>${checkedCount}/${MAX_PER_DAY}</span>
-                <div class="progress-bar">
-                  <div class="progress-fill ${fillClass}" style="width:${percent}%;"></div>
-                </div>
-              </div>
+      <td>
+        <div class="date-cell">
+          <span class="date-text">${formatDateDisplay(dateStr)}</span>
+          <div class="progress-wrapper">
+            <span>${checkedCount}/${MAX_PER_DAY}</span>
+            <div class="progress-bar">
+              <div class="progress-fill ${fillClass}" style="width:${percent}%;"></div>
             </div>
-          </td>
-        `;
+          </div>
+        </div>
+      </td>
+    `;
         for (let j = 0; j < names.length; j++) {
           const checked = row[j] === true;
           const name = names[j];
@@ -238,18 +239,18 @@
           }
           const display = checked ? '✔' : '•';
           html += `
-            <td>
-              <span class="${cellClass}" 
-                    ${!isArchive ? `data-date="${dateStr}" data-name="${name}" data-checked="${checked}"` : ''}>
-                ${display}
-              </span>
-            </td>
-          `;
+        <td>
+          <span class="${cellClass}" 
+                ${!isArchive ? `data-date="${dateStr}" data-name="${name}" data-checked="${checked}"` : ''}>
+            ${display}
+          </span>
+        </td>
+      `;
         }
         html += '</tr>';
       });
 
-      html += `</tbody></table>`;
+      html += `</tbody></table></div>`;
       return html;
     }
 
