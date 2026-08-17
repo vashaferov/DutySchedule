@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>График дежурств</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Шапка -->
+    <div class="header">
+      <h1>📅 График дежурств</h1>
+    </div>
+    <div class="info">
+      <span>ℹ️</span>
+      <span>
+        <strong>Клик</strong> по ячейке — добавить/убрать дежурного.
+        Когда выбрано <strong><span id="max-info">2</span></strong> человека, остальные блокируются.
+        Прошедшие даты перемещены в архив (только просмотр).
+      </span>
+    </div>
+
+    <!-- Контейнер для загрузки -->
+    <div id="loading" class="table-wrapper">
+      <div style="padding:20px; text-align:center;">
+        <span class="spinner"></span> Загрузка...
+      </div>
+    </div>
+
+    <!-- Основная таблица (будущие даты) -->
+    <div id="main-section" class="section" style="display:none;">
+      <div class="section-title">
+        🟢 Актуальные даты
+        <span class="count" id="main-count"></span>
+      </div>
+      <div id="main-table-container"></div>
+      <div id="main-pagination" class="pagination"></div>
+    </div>
+
+    <!-- Архив (прошедшие даты) -->
+    <div id="archive-section" class="section" style="display:none;">
+      <div class="section-title">
+        📦 Архив
+        <span class="count" id="archive-count"></span>
+      </div>
+      <div id="archive-table-container" class="archive-table"></div>
+    </div>
+  </div>
+
+  <!-- Подключаем конфиг -->
+  <script src="config.js"></script>
+
+  <!-- Основной скрипт -->
+  <script>
+    // Используем глобальные переменные из config.js
+    // API_URL, PAGE_SIZE, MAX_PER_DAY определены в config.js
+
+    // Обновляем элементы интерфейса с максимальным числом
+    document.getElementById('max-badge').textContent = MAX_PER_DAY;
+    document.getElementById('max-info').textContent = MAX_PER_DAY;
+
+    let allDates = [];
+    let futureDates = [];
+    let pastDates = [];
+    let currentPage = 0;
+
+    // ---------- Загрузка ----------
+    async function loadData() {
+      const loading = document.getElementById('loading');
+      const mainSection = document.getElementById('main-section');
+      const archiveSection = document.getElementById('archive-section');
+
+      try {
+        const resp = await fetch(API_URL);
+        if (!resp.ok) throw new Error('Ошибка загрузки');
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+
+        const { dates, names, matrix } = data;
+        if (!dates || !names || !matrix) throw new Error('Некорректные данные');
+
+        allDates = dates.map((dateStr, i) => ({
+          dateStr: dateStr,
+          names: names,
+          matrixRow: matrix[i] || []
+        }));
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        futureDates = [];
+        pastDates = [];
+
+        allDates.forEach(item => {
+          const d = parseDateDDMMYYYY(item.dateStr);
+          if (!d) {
+            futureDates.push(item);
+            return;
+          }
+          d.setHours(0, 0, 0, 0);
+          if (d < today) pastDates.push(item);
+          else futureDates.push(item);
+        });
+
+        futureDates.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
+        pastDates.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
+
+        loading.style.display = 'none';
+        mainSection.style.display = 'block';
+        archiveSection.style.display = 'block';
+
+        renderMainTable();
+        renderArchiveTable();
+        updateCounts();
+
+      } catch (e) {
+        loading.innerHTML = `<div style="color:#ef4444; padding:20px;">❌ ${e.message}</div>`;
+        console.error(e);
+      }
+    }
+
+    // ---------- Вспомогательные функции для дат ----------
+    function parseDateDDMMYYYY(str) {
+      if (!str) return null;
+      const parts = str.split('.');
+      if (parts.length !== 3) return null;
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const y = parseInt(parts[2], 10);
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+      return new Date(y, m, d);
+    }
+
+    function formatDateDisplay(dateStr) {
+      return dateStr;
+    }
+
+    // ---------- Рендер основной таблицы (с пагинацией) ----------
+    function renderMainTable() {
+      const container = document.getElementById('main-table-container');
+      const paginationEl = document.getElementById('main-pagination');
+
+      if (futureDates.length === 0) {
+        container.innerHTML = '<p style="padding:20px; color:#64748b;">Нет предстоящих дежурств.</p>';
+        paginationEl.innerHTML = '';
+        return;
+      }
+
+      const totalPages = Math.ceil(futureDates.length / PAGE_SIZE);
+      if (currentPage >= totalPages) currentPage = totalPages - 1;
+      if (currentPage < 0) currentPage = 0;
+
+      const start = currentPage * PAGE_SIZE;
+      const end = Math.min(start + PAGE_SIZE, futureDates.length);
+      const pageItems = futureDates.slice(start, end);
+
+      container.innerHTML = buildTableHTML(pageItems, false);
+      attachMainEvents();
+
+      paginationEl.innerHTML = `
+        <button class="prev" ${currentPage === 0 ? 'disabled' : ''}>← Назад</button>
+        <span>${currentPage + 1} / ${totalPages}</span>
+        <button class="next" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
+      `;
+      paginationEl.querySelector('.prev').addEventListener('click', () => {
+        if (currentPage > 0) { currentPage--; renderMainTable(); }
+      });
+      paginationEl.querySelector('.next').addEventListener('click', () => {
+        if (currentPage < totalPages - 1) { currentPage++; renderMainTable(); }
+      });
+    }
+
+    // ---------- Рендер архива ----------
+    function renderArchiveTable() {
+      const container = document.getElementById('archive-table-container');
+      if (pastDates.length === 0) {
+        container.innerHTML = '<p style="padding:20px; color:#64748b;">Архив пуст.</p>';
+        return;
+      }
+      container.innerHTML = buildTableHTML(pastDates, true);
+    }
+
+    // ---------- Построение HTML таблицы ----------
+    function buildTableHTML(items, isArchive) {
+      if (!items || items.length === 0) return '';
+      const names = items[0].names;
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Дата</th>
+              ${names.map(name => `<th>${name}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      items.forEach(item => {
+        const dateStr = item.dateStr;
+        const row = item.matrixRow;
+        const checkedCount = row.filter(v => v === true).length;
+        const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
+        const fillClass = checkedCount === MAX_PER_DAY ? 'full' : '';
+
+        html += `<tr data-date="${dateStr}">`;
+        html += `
+          <td>
+            <div class="date-cell">
+              <span class="date-text">${formatDateDisplay(dateStr)}</span>
+              <div class="progress-wrapper">
+                <span>${checkedCount}/${MAX_PER_DAY}</span>
+                <div class="progress-bar">
+                  <div class="progress-fill ${fillClass}" style="width:${percent}%;"></div>
+                </div>
+              </div>
+            </div>
+          </td>
+        `;
+        for (let j = 0; j < names.length; j++) {
+          const checked = row[j] === true;
+          const name = names[j];
+          let cellClass = 'cell';
+          if (isArchive) {
+            cellClass += ' archive-cell';
+          } else {
+            cellClass += checked ? ' selected' : '';
+          }
+          const display = checked ? '✔' : '•';
+          html += `
+            <td>
+              <span class="${cellClass}" 
+                    ${!isArchive ? `data-date="${dateStr}" data-name="${name}" data-checked="${checked}"` : ''}>
+                ${display}
+              </span>
+            </td>
+          `;
+        }
+        html += '</tr>';
+      });
+
+      html += `</tbody></table>`;
+      return html;
+    }
+
+    // ---------- Счётчики ----------
+    function updateCounts() {
+      document.getElementById('main-count').textContent = `(${futureDates.length})`;
+      document.getElementById('archive-count').textContent = `(${pastDates.length})`;
+    }
+
+    // ---------- Обработчики для основной таблицы ----------
+    function attachMainEvents() {
+      updateRowStates('main-table-container');
+      const container = document.getElementById('main-table-container');
+      container.querySelectorAll('.cell:not(.archive-cell)').forEach(cell => {
+        cell.removeEventListener('click', toggleCell);
+        cell.addEventListener('click', toggleCell);
+      });
+    }
+
+    // ---------- Обновление состояний строк ----------
+    function updateRowStates(containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      const rows = container.querySelectorAll('tbody tr');
+      rows.forEach(tr => {
+        const cells = tr.querySelectorAll('.cell:not(.archive-cell)');
+        let checkedCount = 0;
+        cells.forEach(cell => {
+          if (cell.dataset.checked === 'true') checkedCount++;
+        });
+
+        const progressFill = tr.querySelector('.progress-fill');
+        const countSpan = tr.querySelector('.progress-wrapper span');
+        if (progressFill) {
+          const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
+          progressFill.style.width = percent + '%';
+          if (checkedCount === MAX_PER_DAY) progressFill.classList.add('full');
+          else progressFill.classList.remove('full');
+        }
+        if (countSpan) countSpan.textContent = `${checkedCount}/${MAX_PER_DAY}`;
+
+        if (checkedCount === MAX_PER_DAY) tr.classList.add('row-full');
+        else tr.classList.remove('row-full');
+
+        if (checkedCount >= MAX_PER_DAY) {
+          cells.forEach(cell => {
+            if (cell.dataset.checked !== 'true') cell.classList.add('disabled');
+            else cell.classList.remove('disabled');
+          });
+        } else {
+          cells.forEach(cell => cell.classList.remove('disabled'));
+        }
+      });
+    }
+
+    // ---------- Обработчик клика по ячейке ----------
+    async function toggleCell(event) {
+      const cell = event.currentTarget;
+      if (cell.classList.contains('disabled') || cell.classList.contains('archive-cell')) return;
+
+      const date = cell.dataset.date;
+      const name = cell.dataset.name;
+      const currentChecked = cell.dataset.checked === 'true';
+      const newValue = !currentChecked;
+
+      cell.dataset.checked = String(newValue);
+      cell.textContent = newValue ? '✔' : '•';
+      newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
+
+      updateRowStates('main-table-container');
+
+      try {
+        const params = new URLSearchParams();
+        params.append('date', date);
+        params.append('name', name);
+        params.append('value', String(newValue));
+        await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString()
+        });
+      } catch (e) {
+        alert('Ошибка сохранения. Попробуйте ещё раз.');
+        cell.dataset.checked = String(currentChecked);
+        cell.textContent = currentChecked ? '✔' : '•';
+        currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
+        updateRowStates('main-table-container');
+        console.error(e);
+      }
+    }
+
+    // Запуск
+    loadData();
+  </script>
+</body>
+</html>
