@@ -99,15 +99,15 @@ body {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding: 2px 0;
-  width: 100%;
+  max-width: 100%;
 }
 
 table {
-  width: 100%;
+  width: auto;          /* не растягивается на всю ширину */
+  min-width: 600px;     /* заставляет скролл на мобильных */
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.95rem;
-  min-width: 600px; /* гарантирует скролл на мобильных */
 }
 
 thead th {
@@ -323,10 +323,10 @@ tbody tr.row-full td:first-child .progress-fill {
   color: #64748b;
 }
 
-/* ---------- Статистика ---------- */
+/* ---------- Статистика (улучшенная адаптация) ---------- */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 16px;
   background: #ffffff;
   border-radius: 20px;
@@ -461,203 +461,84 @@ tbody tr.row-full td:first-child .progress-fill {
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-/* ---------- Адаптивность (медиа-запросы) ---------- */
+/* ---------- Адаптивность ---------- */
 
 /* Планшеты и маленькие ноутбуки */
 @media (max-width: 1024px) {
-  body {
-    padding: 20px 12px;
-  }
-  .container {
-    max-width: 100%;
-  }
-  table {
-    font-size: 0.85rem;
-    min-width: 500px;
-  }
-  .cell {
-    width: 34px;
-    height: 34px;
-    font-size: 0.9rem;
-  }
-  thead th,
-  tbody td {
-    padding: 10px 6px;
-  }
-  .date-cell {
-    min-width: 60px;
-  }
+  body { padding: 20px 12px; }
+  .container { max-width: 100%; }
+  table { font-size: 0.85rem; min-width: 500px; }
+  .cell { width: 34px; height: 34px; font-size: 0.9rem; }
+  thead th, tbody td { padding: 10px 6px; }
+  .date-cell { min-width: 60px; }
   .stats-grid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 12px;
     padding: 16px;
   }
 }
 
-/* Мобильные телефоны (исправлен скролл) */
+/* Мобильные телефоны (до 640px) */
 @media (max-width: 640px) {
-  body {
-    padding: 12px 6px;
-  }
-  .header h1 {
-    font-size: 1.3rem;
-  }
-  .badge {
-    font-size: 0.7rem;
-    padding: 4px 10px;
-  }
-  .info {
-    font-size: 0.75rem;
-    padding: 8px 12px;
-    margin-bottom: 16px;
-  }
-  .section-title {
-    font-size: 1rem;
-  }
+  body { padding: 12px 6px; }
+  .header h1 { font-size: 1.3rem; }
+  .badge { font-size: 0.7rem; padding: 4px 10px; }
+  .info { font-size: 0.75rem; padding: 8px 12px; margin-bottom: 16px; }
+  .section-title { font-size: 1rem; }
   .table-wrapper {
     border-radius: 14px;
     padding: 0;
-    overflow-x: scroll; /* принудительный скролл */
+    overflow-x: auto;   /* принудительный скролл */
     -webkit-overflow-scrolling: touch;
   }
   table {
     font-size: 0.75rem;
-    min-width: 420px; /* таблица шире экрана → скролл */
+    min-width: 420px;    /* таблица уже экрана → скролл */
   }
-  thead th {
-    padding: 8px 4px;
-    font-size: 0.65rem;
-  }
-  tbody td {
-    padding: 8px 4px;
-  }
-  tbody td:first-child {
-    padding-left: 10px;
-  }
-  .cell {
-    width: 28px;
-    height: 28px;
-    font-size: 0.8rem;
-    border-radius: 6px;
-  }
-  .date-text {
-    font-size: 0.75rem;
-  }
-  .progress-wrapper {
-    font-size: 0.6rem;
-    gap: 4px;
-  }
-  .progress-bar {
-    min-width: 20px;
-    height: 3px;
-  }
+  thead th { padding: 8px 4px; font-size: 0.65rem; }
+  tbody td { padding: 8px 4px; }
+  tbody td:first-child { padding-left: 10px; }
+  .cell { width: 28px; height: 28px; font-size: 0.8rem; border-radius: 6px; }
+  .date-text { font-size: 0.75rem; }
+  .progress-wrapper { font-size: 0.6rem; gap: 4px; }
+  .progress-bar { min-width: 20px; height: 3px; }
+  
+  /* Статистика в две колонки */
   .stats-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
     padding: 12px;
   }
-  .stats-card .value {
-    font-size: 1.4rem;
-  }
-  .stats-card .name {
-    font-size: 0.75rem;
-  }
-  .stats-card .label {
-    font-size: 0.6rem;
-  }
-  .pagination button {
-    padding: 6px 14px;
-    font-size: 0.8rem;
-    min-height: 36px;
-    min-width: 36px;
-  }
-  .pagination span {
-    font-size: 0.8rem;
-  }
-  .chart-wrapper {
-    padding: 12px;
-    margin-top: 16px;
-  }
-  .legend {
-    font-size: 0.7rem;
-    gap: 6px 12px;
-  }
-  .legend-color {
-    width: 10px;
-    height: 10px;
-  }
-  #loading {
-    padding: 20px;
-    font-size: 0.9rem;
-  }
-}
-
-/* ---------- Дополнительная адаптация статистики ---------- */
-@media (max-width: 640px) {
-  .stats-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px;
-    padding: 12px;
-  }
-  .stats-card {
-    padding: 10px 8px;
-  }
-  .stats-card .value {
-    font-size: 1.2rem;
-  }
-  .stats-card .name {
-    font-size: 0.7rem;
-  }
-  .stats-card .label {
-    font-size: 0.55rem;
-  }
-  .progress-bar {
-    height: 4px;
-    margin-top: 4px;
-  }
-}
-
-@media (max-width: 400px) {
-  .stats-grid {
-    grid-template-columns: 1fr 1fr; /* две колонки на очень маленьких */
-    gap: 6px;
-    padding: 8px;
-  }
-  .stats-card {
-    padding: 8px 4px;
-  }
-  .stats-card .value {
-    font-size: 1rem;
-  }
-  .stats-card .name {
-    font-size: 0.65rem;
-  }
-  .stats-card .label {
-    font-size: 0.5rem;
-  }
+  .stats-card .value { font-size: 1.4rem; }
+  .stats-card .name { font-size: 0.75rem; }
+  .stats-card .label { font-size: 0.6rem; }
+  .stats-card { padding: 10px 8px; }
+  .progress-bar { height: 4px; margin-top: 4px; }
+  
+  .pagination button { padding: 6px 14px; font-size: 0.8rem; min-height: 36px; min-width: 36px; }
+  .pagination span { font-size: 0.8rem; }
+  .chart-wrapper { padding: 12px; margin-top: 16px; }
+  .legend { font-size: 0.7rem; gap: 6px 12px; }
+  .legend-color { width: 10px; height: 10px; }
+  #loading { padding: 20px; font-size: 0.9rem; }
 }
 
 /* Очень маленькие экраны (до 400px) */
 @media (max-width: 400px) {
   .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr; /* остаётся две колонки */
+    gap: 6px;
+    padding: 8px;
   }
-  table {
-    min-width: 320px;
-    font-size: 0.7rem;
-  }
-  .cell {
-    width: 24px;
-    height: 24px;
-    font-size: 0.7rem;
-  }
-  thead th,
-  tbody td {
-    padding: 6px 2px;
-  }
+  .stats-card { padding: 8px 4px; }
+  .stats-card .value { font-size: 1rem; }
+  .stats-card .name { font-size: 0.65rem; }
+  .stats-card .label { font-size: 0.5rem; }
+  
+  table { min-width: 320px; font-size: 0.7rem; }
+  .cell { width: 24px; height: 24px; font-size: 0.7rem; }
+  thead th, tbody td { padding: 6px 2px; }
 }
