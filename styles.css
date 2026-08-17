@@ -91,14 +91,15 @@ body {
   color: #64748b;
 }
 
-/* ---------- Таблицы ---------- */
+/* ---------- Таблицы (исправлен скролл) ---------- */
 .table-wrapper {
   background: #ffffff;
   border-radius: 20px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
   overflow-x: auto;
-  padding: 2px 0;
   -webkit-overflow-scrolling: touch;
+  padding: 2px 0;
+  width: 100%;
 }
 
 table {
@@ -106,7 +107,7 @@ table {
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.95rem;
-  min-width: 600px;
+  min-width: 600px; /* гарантирует скролл на мобильных */
 }
 
 thead th {
@@ -498,7 +499,7 @@ tbody tr.row-full td:first-child .progress-fill {
   }
 }
 
-/* Мобильные телефоны */
+/* Мобильные телефоны (исправлен скролл) */
 @media (max-width: 640px) {
   body {
     padding: 12px 6px;
@@ -521,10 +522,12 @@ tbody tr.row-full td:first-child .progress-fill {
   .table-wrapper {
     border-radius: 14px;
     padding: 0;
+    overflow-x: scroll; /* принудительный скролл */
+    -webkit-overflow-scrolling: touch;
   }
   table {
     font-size: 0.75rem;
-    min-width: 420px;
+    min-width: 420px; /* таблица шире экрана → скролл */
   }
   thead th {
     padding: 8px 4px;
@@ -591,6 +594,51 @@ tbody tr.row-full td:first-child .progress-fill {
   #loading {
     padding: 20px;
     font-size: 0.9rem;
+  }
+}
+
+/* ---------- Дополнительная адаптация статистики ---------- */
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    padding: 12px;
+  }
+  .stats-card {
+    padding: 10px 8px;
+  }
+  .stats-card .value {
+    font-size: 1.2rem;
+  }
+  .stats-card .name {
+    font-size: 0.7rem;
+  }
+  .stats-card .label {
+    font-size: 0.55rem;
+  }
+  .progress-bar {
+    height: 4px;
+    margin-top: 4px;
+  }
+}
+
+@media (max-width: 400px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr; /* две колонки на очень маленьких */
+    gap: 6px;
+    padding: 8px;
+  }
+  .stats-card {
+    padding: 8px 4px;
+  }
+  .stats-card .value {
+    font-size: 1rem;
+  }
+  .stats-card .name {
+    font-size: 0.65rem;
+  }
+  .stats-card .label {
+    font-size: 0.5rem;
   }
 }
 
