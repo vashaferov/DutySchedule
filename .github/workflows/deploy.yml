@@ -12,18 +12,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Debug SSH key (безопасно, не выводит ключ)
-        run: |
-          echo "Проверяем наличие ключа..."
-          if [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
-            echo "Ключ установлен (длина: ${#SSH_KEY})"
-          else
-            echo "Ключ НЕ установлен!"
-            exit 1
-          fi
-        env:
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -35,6 +23,21 @@ jobs:
           script: |
             set -e
             echo "Подключение успешно!"
+
+            # Переходим в папку проекта
             cd /var/DutySchedule
+
+            # Разрешаем Git работать с этой папкой (решает ошибку dubious ownership)
+            git config --global --add safe.directory /var/DutySchedule
+
+            # Обновляем файлы
             git pull
-            docker restart DutySchedule
+
+            # Проверяем, существует ли контейнер
+            if docker ps -a --format '{{.Names}}' | grep -q "^DutySchedule$"; then
+              echo "Контейнер DutySchedule найден, перезапускаем..."
+              docker restart DutySchedule
+            else
+              echo "Контейнер DutySchedule не найден, создаём и запускаем..."
+              docker run -d --name DutySchedule -p 80:80 -v $(pwd):/usr/share/nginx/html:ro nginx:alpine
+            fi
