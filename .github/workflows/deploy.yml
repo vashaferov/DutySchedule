@@ -12,13 +12,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Debug SSH key (безопасно, не выводит ключ)
+        run: |
+          echo "Проверяем наличие ключа..."
+          if [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "Ключ установлен (длина: ${#SSH_KEY})"
+          else
+            echo "Ключ НЕ установлен!"
+            exit 1
+          fi
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.VDS_HOST }}
           username: ${{ secrets.VDS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script_stop: true
           script: |
+            set -e
+            echo "Подключение успешно!"
             cd /var/DutySchedule
             git pull
-            sudo docker restart DutySchedule
+            docker restart DutySchedule
