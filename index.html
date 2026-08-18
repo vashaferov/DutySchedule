@@ -353,20 +353,18 @@
         return;
       }
 
-      const names = allDates[0].names;
+      const names = pastDates[0].names;
       const totals = {};
       names.forEach(name => totals[name] = 0);
 
-      // Подсчёт дежурств по всем датам
-      allDates.forEach(item => {
+      // Подсчёт дежурств по архивным датам
+      pastDates.forEach(item => {
         const row = item.matrixRow;
         for (let i = 0; i < names.length; i++) {
           if (row[i] === true) totals[names[i]]++;
         }
       });
 
-      const totalMarks = Object.values(totals).reduce((a, b) => a + b, 0);
-      const totalDates = allDates.length;
       const maxVal = Math.max(...Object.values(totals));
       const maxName = Object.keys(totals).find(k => totals[k] === maxVal);
 
@@ -375,12 +373,12 @@
 
       // Карточка "Максимум"
       html += `
-        <div class="stats-card stats-total">
-          <div class="name">🏆 Максимум</div>
-          <span class="value">${maxVal}</span>
-          <div class="label">${maxName}</div>
-        </div>
-      `;
+    <div class="stats-card stats-total">
+      <div class="name">🏆 Максимум</div>
+      <span class="value">${maxVal}</span>
+      <div class="label">${maxName}</div>
+    </div>
+  `;
 
       // Карточки по сотрудникам с прогресс-баром
       names.forEach(name => {
