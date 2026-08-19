@@ -13,6 +13,9 @@
     <!-- Шапка -->
     <div class="header">
       <h1>📅 График дежурств</h1>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button id="theme-toggle" class="theme-toggle" title="Переключить тему">🌙</button>
+      </div>
     </div>
     <div class="info">
       <span>ℹ️</span>
@@ -73,6 +76,42 @@
     let futureDates = [];
     let pastDates = [];
     let currentPage = 0;
+
+    // ---------- Тема (светлая/тёмная) ----------
+    function getSystemTheme() {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'light' ? 'dark' : 'light';
+      applyTheme(next);
+    }
+
+    // Инициализация темы
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      applyTheme(savedTheme);
+    } else {
+      applyTheme(getSystemTheme());
+    }
+
+    // Слушатель изменения системной темы (если пользователь не переключал вручную)
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem('theme')) {
+        applyTheme(e.matches ? 'dark' : 'light');
+      }
+    });
+
+    // Вешаем обработчик на кнопку
+    document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
 
     // ---------- Загрузка ----------
     async function loadData() {
@@ -306,7 +345,7 @@
       });
     }
 
-    // ---------- Обработчик клика по ячейке ----------
+    // ---------- Обработчик клика по ячейке (с подтверждением) ----------
     async function toggleCell(event) {
       const cell = event.currentTarget;
       if (cell.classList.contains('disabled') || cell.classList.contains('archive-cell')) return;
@@ -316,6 +355,19 @@
       const currentChecked = cell.dataset.checked === 'true';
       const newValue = !currentChecked;
 
+      // Запрашиваем подтверждение в зависимости от действия
+      let confirmMessage;
+      if (currentChecked) {
+        confirmMessage = `Вы уверены, что хотите снять ${name} с ${date}?`;
+      } else {
+        confirmMessage = `Вы уверены, что хотите назначить ${name} на ${date}?`;
+      }
+
+      if (!confirm(confirmMessage)) {
+        return; // пользователь отменил
+      }
+
+      // Оптимистичное обновление UI
       cell.dataset.checked = String(newValue);
       cell.textContent = newValue ? '✔' : '•';
       newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
@@ -334,6 +386,7 @@
         });
       } catch (e) {
         alert('Ошибка сохранения. Попробуйте ещё раз.');
+        // Откат
         cell.dataset.checked = String(currentChecked);
         cell.textContent = currentChecked ? '✔' : '•';
         currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');

@@ -22,22 +22,11 @@ jobs:
           script_stop: true
           script: |
             set -e
-            echo "Подключение успешно!"
-
-            # Переходим в папку проекта
             cd /var/DutySchedule
-
-            # Разрешаем Git работать с этой папкой (решает ошибку dubious ownership)
             git config --global --add safe.directory /var/DutySchedule
-
-            # Обновляем файлы
             git pull
-
-            # Проверяем, существует ли контейнер
             if docker ps -a --format '{{.Names}}' | grep -q "^DutySchedule$"; then
-              echo "Контейнер DutySchedule найден, перезапускаем..."
               docker restart DutySchedule
             else
-              echo "Контейнер DutySchedule не найден, создаём и запускаем..."
               docker run -d --name DutySchedule -p 80:80 -v $(pwd):/usr/share/nginx/html:ro nginx:alpine
             fi
