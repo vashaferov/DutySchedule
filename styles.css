@@ -513,3 +513,57 @@ tbody tr.row-full td:first-child .progress-fill {
   .cell { width: 24px; height: 24px; font-size: 0.7rem; }
   thead th, tbody td { padding: 6px 2px; }
 }
+
+/* ---------- Вкладки ---------- */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: var(--bg-cell-hover);
+  color: var(--text-secondary);
+}
+
+.tab-btn.active {
+  background: var(--bg-cell-selected);
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Стили для таблицы репертуара */
+#repertoire-table-container table td {
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+  vertical-align: top;
+  padding: 10px 8px;
+}
+#repertoire-table-container table td:first-child {
+  text-align: center;
+  font-weight: 600;
+  white-space: nowrap;
+}
