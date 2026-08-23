@@ -567,3 +567,14 @@ tbody tr.row-full td:first-child .progress-fill {
   font-weight: 600;
   white-space: nowrap;
 }
+
+.copyable-song {
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.copyable-song:hover {
+  background: var(--bg-cell-hover);
+}
