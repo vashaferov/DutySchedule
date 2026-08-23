@@ -13,8 +13,17 @@
     <!-- Шапка -->
     <div class="header">
       <h1>📅 График дежурств</h1>
-      <div style="display:flex; align-items:center; gap:12px;">
-        <button id="theme-toggle" class="theme-toggle" title="Переключить тему">🌙</button>
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div id="auth-section" style="display:flex; align-items:center; gap:8px;">
+          <button id="login-btn" class="auth-btn">🔑 Войти</button>
+          <span id="user-display" style="display:none; font-weight:500;"></span>
+          <button id="logout-btn"
+            style="display:none; padding:4px 10px; border:none; border-radius:6px; background:var(--bg-cell); cursor:pointer;">Выйти</button>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙</button>
+        <button id="admin-panel-btn"
+          style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">👥
+          Управление пользователями</button>
       </div>
     </div>
 
@@ -74,7 +83,6 @@
 
     <!-- Вкладка: Репертуар -->
     <div id="tab-repertoire" class="tab-content" style="display:none;">
-      <!-- Актуальный репертуар (с пагинацией) -->
       <div class="section">
         <div class="section-title">
           🎵 Актуальный репертуар
@@ -84,7 +92,6 @@
         <div id="repertoire-pagination" class="pagination"></div>
       </div>
 
-      <!-- Архив репертуара (без пагинации) -->
       <div class="section">
         <div class="section-title">
           📦 Архив репертуара
@@ -94,6 +101,44 @@
       </div>
     </div>
 
+    <!-- Модальное окно входа -->
+    <div id="login-modal"
+      style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1002; justify-content:center; align-items:center;">
+      <div
+        style="background:var(--bg-card); padding:24px; border-radius:20px; max-width:360px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <h3 style="margin-top:0;">🔐 Вход в систему</h3>
+        <label style="display:block; margin-top:12px;">Выберите пользователя</label>
+        <select id="login-user-select"
+          style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); font-size:1rem;">
+          <option value="">— Выберите —</option>
+        </select>
+        <label style="display:block; margin-top:12px;">PIN-код</label>
+        <input type="password" id="login-pin-input" placeholder="Введите PIN"
+          style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); font-size:1rem; margin-top:4px;">
+        <div style="display:flex; gap:8px; margin-top:16px; justify-content:flex-end;">
+          <button id="login-cancel"
+            style="padding:8px 16px; border:none; border-radius:8px; background:var(--bg-cell); cursor:pointer;">Отмена</button>
+          <button id="login-confirm"
+            style="padding:8px 16px; border:none; border-radius:8px; background:#4f46e5; color:#fff; cursor:pointer;">Войти</button>
+        </div>
+        <div id="login-error" style="color:#ef4444; font-size:0.9rem; margin-top:8px; display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Модальное окно управления пользователями (админ) -->
+    <div id="admin-modal"
+      style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1001; justify-content:center; align-items:center;">
+      <div
+        style="background:var(--bg-card); padding:24px; border-radius:20px; max-width:700px; width:95%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <h3 style="margin-top:0;">👥 Управление пользователями</h3>
+        <div id="admin-user-list"></div>
+        <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
+          <button id="admin-modal-close"
+            style="padding:8px 16px; border:none; border-radius:8px; background:var(--bg-cell); cursor:pointer;">Закрыть</button>
+        </div>
+        <div id="admin-modal-error" style="color:#ef4444; font-size:0.9rem; margin-top:8px; display:none;"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Подключаем конфиг -->
@@ -105,7 +150,13 @@
     let futureDates = [];
     let pastDates = [];
     let currentPage = 0;
-    let repertoireData = {}; // { 'ДД.ММ.ГГГГ': { songs: [...], colors: [...] } }
+    let repertoireData = {};
+    let repertoireFuture = [];
+    let repertoirePast = [];
+    let repertoireCurrentPage = 0;
+    let currentUser = '';
+    let currentPin = '';
+    let isAdmin = false;
 
     // ---------- Инициализация темы ----------
     document.getElementById('max-info').textContent = MAX_PER_DAY;
@@ -142,6 +193,251 @@
 
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
 
+    // ---------- API-вызовы ----------
+    async function verifyPinOnServer(name, pin) {
+      const url = API_URL + '?action=verifyPin&name=' + encodeURIComponent(name) + '&pin=' + encodeURIComponent(pin);
+      const resp = await fetch(url);
+      const data = await resp.json();
+      return data.success === true;
+    }
+
+    async function loadUsers() {
+      const resp = await fetch(API_URL + '?action=getUserNames');
+      const data = await resp.json();
+      if (data.error) {
+        console.error('Ошибка загрузки пользователей:', data.error);
+        return [];
+      }
+      return data.names || [];
+    }
+
+    async function loadUsersForAdmin(adminName, adminPin) {
+      const url = `${API_URL}?action=getUsers&adminName=${encodeURIComponent(adminName)}&adminPin=${encodeURIComponent(adminPin)}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      return data.users || [];
+    }
+
+    // ---------- Авторизация ----------
+    function updateAuthUI() {
+      const loginBtn = document.getElementById('login-btn');
+      const userDisplay = document.getElementById('user-display');
+      const logoutBtn = document.getElementById('logout-btn');
+      const adminBtn = document.getElementById('admin-panel-btn');
+
+      if (currentUser) {
+        loginBtn.style.display = 'none';
+        userDisplay.textContent = '👤 ' + currentUser;
+        userDisplay.style.display = 'inline';
+        logoutBtn.style.display = 'inline';
+        adminBtn.style.display = isAdmin ? 'inline-block' : 'none';
+      } else {
+        loginBtn.style.display = 'inline';
+        userDisplay.style.display = 'none';
+        logoutBtn.style.display = 'none';
+        adminBtn.style.display = 'none';
+      }
+    }
+
+    function setUser(name, pin, admin) {
+      currentUser = name;
+      currentPin = pin;
+      isAdmin = admin;
+      localStorage.setItem('currentUser', name);
+      localStorage.setItem('currentUserPin', pin);
+      updateAuthUI();
+      updateRowStates('main-table-container');
+    }
+
+    function logoutUser() {
+      currentUser = '';
+      currentPin = '';
+      isAdmin = false;
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('currentUserPin');
+      updateAuthUI();
+      updateRowStates('main-table-container');
+    }
+
+    // Попытка автоматического входа при загрузке
+    async function autoLogin() {
+      const savedUser = localStorage.getItem('currentUser');
+      const savedPin = localStorage.getItem('currentUserPin');
+      if (!savedUser || !savedPin) return;
+      const valid = await verifyPinOnServer(savedUser, savedPin);
+      if (valid) {
+        // Проверяем, является ли пользователь администратором
+        try {
+          const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(savedUser)}&adminPin=${encodeURIComponent(savedPin)}`);
+          const data = await resp.json();
+          if (!data.error) {
+            // Пользователь админ
+            isAdmin = true;
+          } else {
+            isAdmin = false;
+          }
+        } catch (e) {
+          isAdmin = false;
+        }
+        currentUser = savedUser;
+        currentPin = savedPin;
+        updateAuthUI();
+        updateRowStates('main-table-container');
+      } else {
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('currentUserPin');
+      }
+    }
+
+    // ---------- Модальное окно входа ----------
+    async function showLoginModal() {
+      const modal = document.getElementById('login-modal');
+      const select = document.getElementById('login-user-select');
+      const pinInput = document.getElementById('login-pin-input');
+      const error = document.getElementById('login-error');
+      const confirmBtn = document.getElementById('login-confirm');
+      const cancelBtn = document.getElementById('login-cancel');
+
+      // Загружаем список имён (массив строк)
+      const namesList = await loadUsers();
+      select.innerHTML = '<option value="">— Выберите —</option>';
+      namesList.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+
+      pinInput.value = '';
+      error.style.display = 'none';
+      modal.style.display = 'flex';
+      pinInput.focus();
+
+      const onConfirm = async () => {
+        const name = select.value;
+        const pin = pinInput.value.trim();
+        if (!name) {
+          error.textContent = 'Выберите пользователя';
+          error.style.display = 'block';
+          return;
+        }
+        if (!pin) {
+          error.textContent = 'Введите PIN-код';
+          error.style.display = 'block';
+          return;
+        }
+        try {
+          const valid = await verifyPinOnServer(name, pin);
+          if (valid) {
+            // Определяем роль (администратор или нет)
+            let admin = false;
+            try {
+              const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(name)}&adminPin=${encodeURIComponent(pin)}`);
+              const data = await resp.json();
+              if (!data.error) admin = true;
+            } catch (e) { /* не админ */ }
+            modal.style.display = 'none';
+            setUser(name, pin, admin);
+          } else {
+            error.textContent = 'Неверный PIN-код';
+            error.style.display = 'block';
+            pinInput.value = '';
+            pinInput.focus();
+          }
+        } catch (e) {
+          error.textContent = 'Ошибка проверки PIN';
+          error.style.display = 'block';
+          console.error(e);
+        }
+      };
+
+      const onCancel = () => {
+        modal.style.display = 'none';
+      };
+
+      confirmBtn.onclick = onConfirm;
+      cancelBtn.onclick = onCancel;
+      pinInput.onkeydown = (e) => { if (e.key === 'Enter') onConfirm(); };
+      modal.addEventListener('click', function (e) {
+        if (e.target === this) onCancel();
+      });
+    }
+
+    document.getElementById('login-btn').addEventListener('click', showLoginModal);
+    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+
+    // ---------- Управление пользователями (админ) ----------
+    document.getElementById('admin-panel-btn').addEventListener('click', async function () {
+      if (!isAdmin) return;
+      try {
+        const userList = await loadUsersForAdmin(currentUser, currentPin);
+        const modal = document.getElementById('admin-modal');
+        const container = document.getElementById('admin-user-list');
+        const error = document.getElementById('admin-modal-error');
+        error.style.display = 'none';
+        let html = '<table style="width:100%; border-collapse:collapse;">';
+        html += '<tr><th style="text-align:left; padding:8px;">Имя</th><th style="text-align:left; padding:8px;">Новый PIN</th><th style="text-align:left; padding:8px;">Действие</th></tr>';
+        userList.forEach(u => {
+          html += `
+          <tr>
+            <td style="padding:8px;">${u.name}</td>
+            <td style="padding:8px;"><input type="text" class="admin-pin-input" data-name="${u.name}" placeholder="Введите новый PIN" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></td>
+            <td style="padding:8px;"><button class="admin-save-pin" data-name="${u.name}" style="padding:6px 14px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;">Сохранить</button></td>
+          </tr>
+        `;
+        });
+        html += '</table>';
+        container.innerHTML = html;
+        modal.style.display = 'flex';
+
+        container.querySelectorAll('.admin-save-pin').forEach(btn => {
+          btn.addEventListener('click', async function () {
+            const name = this.dataset.name;
+            const input = document.querySelector(`.admin-pin-input[data-name="${name}"]`);
+            const newPin = input.value.trim();
+            if (!newPin) {
+              error.textContent = 'PIN не может быть пустым';
+              error.style.display = 'block';
+              return;
+            }
+            error.style.display = 'none';
+            try {
+              const resp = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=setPin&name=${encodeURIComponent(name)}&newPin=${encodeURIComponent(newPin)}&adminName=${encodeURIComponent(currentUser)}&adminPin=${encodeURIComponent(currentPin)}`
+              });
+              const result = await resp.json();
+              if (result.error) {
+                error.textContent = result.error;
+                error.style.display = 'block';
+              } else {
+                alert('PIN для ' + name + ' успешно обновлён!');
+                document.getElementById('admin-modal-close').click();
+                // Обновим список
+                document.getElementById('admin-panel-btn').click();
+              }
+            } catch (e) {
+              error.textContent = 'Ошибка сохранения: ' + e.message;
+              error.style.display = 'block';
+            }
+          });
+        });
+
+        document.getElementById('admin-modal-close').onclick = function () {
+          modal.style.display = 'none';
+        };
+        modal.addEventListener('click', function (e) {
+          if (e.target === this) modal.style.display = 'none';
+        });
+      } catch (e) {
+        alert('Ошибка загрузки пользователей: ' + e.message);
+      }
+    });
+
     // ---------- Вкладки ----------
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', function () {
@@ -177,6 +473,7 @@
       const statsSection = document.getElementById('stats-section');
 
       try {
+        // Основной запрос – без пользователей
         const resp = await fetch(API_URL);
         if (!resp.ok) throw new Error('Ошибка загрузки');
         const data = await resp.json();
@@ -190,8 +487,10 @@
           names: names,
           matrixRow: matrix[i] || []
         }));
-
         repertoireData = repertoire || {};
+
+        // Автоматический вход
+        await autoLogin();
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -338,7 +637,7 @@
       return html;
     }
 
-    // ---------- Обновление счётчиков ----------
+    // ---------- Счётчики ----------
     function updateCounts() {
       document.getElementById('main-count').textContent = `(${futureDates.length})`;
       document.getElementById('archive-count').textContent = `(${pastDates.length})`;
@@ -354,7 +653,7 @@
       });
     }
 
-    // ---------- Обновление состояний строк ----------
+    // ---------- Обновление состояний строк (с учётом авторизации) ----------
     function updateRowStates(containerId) {
       const container = document.getElementById(containerId);
       if (!container) return;
@@ -379,42 +678,53 @@
         if (checkedCount === MAX_PER_DAY) tr.classList.add('row-full');
         else tr.classList.remove('row-full');
 
-        if (checkedCount >= MAX_PER_DAY) {
-          cells.forEach(cell => {
-            if (cell.dataset.checked !== 'true') cell.classList.add('disabled');
-            else cell.classList.remove('disabled');
-          });
-        } else {
-          cells.forEach(cell => cell.classList.remove('disabled'));
-        }
+        const isAuthorized = currentUser && currentUser !== '';
+        cells.forEach(cell => {
+          const cellName = cell.dataset.name;
+          const isOwn = isAuthorized && (cellName === currentUser);
+          if (cell.dataset.checked !== 'true') {
+            if (checkedCount >= MAX_PER_DAY || (!isOwn && !isAdmin)) {
+              cell.classList.add('disabled');
+            } else {
+              cell.classList.remove('disabled');
+            }
+          } else {
+            if (!isOwn && !isAdmin) {
+              cell.classList.add('disabled');
+            } else {
+              cell.classList.remove('disabled');
+            }
+          }
+        });
       });
     }
 
-    // ---------- Обработчик клика по ячейке (с подтверждением) ----------
+    // ---------- Обработчик клика по ячейке ----------
     async function toggleCell(event) {
       const cell = event.currentTarget;
       if (cell.classList.contains('disabled') || cell.classList.contains('archive-cell')) return;
 
       const date = cell.dataset.date;
       const name = cell.dataset.name;
-      const currentChecked = cell.dataset.checked === 'true';
-      const newValue = !currentChecked;
-
-      let confirmMessage;
-      if (currentChecked) {
-        confirmMessage = `Вы уверены, что хотите снять ${name} с ${date}?`;
-      } else {
-        confirmMessage = `Вы уверены, что хотите назначить ${name} на ${date}?`;
-      }
-
-      if (!confirm(confirmMessage)) {
+      if (!currentUser) {
+        alert('Пожалуйста, войдите в систему.');
         return;
       }
+      if (!isAdmin && currentUser !== name) {
+        alert('Вы можете изменять только свои ячейки.');
+        return;
+      }
+
+      const currentChecked = cell.dataset.checked === 'true';
+      const newValue = !currentChecked;
+      let confirmMessage = currentChecked
+        ? `Вы уверены, что хотите снять ${name} с ${date}?`
+        : `Вы уверены, что хотите назначить ${name} на ${date}?`;
+      if (!confirm(confirmMessage)) return;
 
       cell.dataset.checked = String(newValue);
       cell.textContent = newValue ? '✔' : '•';
       newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
-
       updateRowStates('main-table-container');
 
       try {
@@ -422,6 +732,9 @@
         params.append('date', date);
         params.append('name', name);
         params.append('value', String(newValue));
+        params.append('changer', currentUser);
+        params.append('pin', currentPin);
+        params.append('isAdmin', String(isAdmin));
         await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -589,8 +902,7 @@
       return div.firstElementChild;
     }
 
-    // ---------- Рендер репертуара ----------
-    // ---------- Рендер репертуара (с пагинацией и архивом) ----------
+    // ---------- Репертуар ----------
     function renderRepertoire() {
       const futureContainer = document.getElementById('repertoire-future-container');
       const pastContainer = document.getElementById('repertoire-past-container');
@@ -598,7 +910,6 @@
       const futureCount = document.getElementById('repertoire-future-count');
       const pastCount = document.getElementById('repertoire-past-count');
 
-      // Разделяем даты на будущие и прошлые
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const future = [];
@@ -618,23 +929,17 @@
         }
       });
 
-      // Сортировка
       future.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
       past.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
 
-      // Сохраняем глобально для пагинации
       repertoireFuture = future;
       repertoirePast = past;
       repertoireCurrentPage = 0;
 
-      // Обновляем счётчики
       futureCount.textContent = `(${future.length})`;
       pastCount.textContent = `(${past.length})`;
 
-      // Рендерим будущие с пагинацией
       renderRepertoireFuture();
-
-      // Рендерим архив (все сразу)
       renderRepertoirePast();
     }
 
@@ -657,12 +962,11 @@
       const pageItems = repertoireFuture.slice(start, end);
 
       container.innerHTML = buildRepertoireTableHTML(pageItems);
-
       paginationEl.innerHTML = `
-    <button class="prev" ${repertoireCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
-    <span>${repertoireCurrentPage + 1} / ${totalPages}</span>
-    <button class="next" ${repertoireCurrentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
-  `;
+      <button class="prev" ${repertoireCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
+      <span>${repertoireCurrentPage + 1} / ${totalPages}</span>
+      <button class="next" ${repertoireCurrentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
+    `;
       paginationEl.querySelector('.prev').addEventListener('click', () => {
         if (repertoireCurrentPage > 0) { repertoireCurrentPage--; renderRepertoireFuture(); }
       });
@@ -670,7 +974,6 @@
         if (repertoireCurrentPage < totalPages - 1) { repertoireCurrentPage++; renderRepertoireFuture(); }
       });
 
-      // Добавляем обработчики копирования для песен
       attachCopyEvents();
     }
 
@@ -681,7 +984,6 @@
         return;
       }
       container.innerHTML = buildRepertoireTableHTML(repertoirePast, true);
-      // Для архива тоже добавляем копирование (опционально)
       attachCopyEvents();
     }
 
@@ -705,7 +1007,6 @@
         const songs = item.songs || [];
         const colors = item.colors || [];
 
-        // Формируем строки песен с классами для копирования
         const songsHTML = songs.length
           ? songs.map(song => `<span class="copyable-song" title="Кликните для копирования">• ${song}</span>`).join('\n')
           : '—';
@@ -715,12 +1016,12 @@
           : '—';
 
         html += `
-      <tr>
-        <td><strong>${dateStr}</strong></td>
-        <td style="white-space:pre-wrap; text-align:left;">${songsHTML}</td>
-        <td style="white-space:pre-wrap; text-align:left;">${colorsHTML}</td>
-      </tr>
-    `;
+        <tr>
+          <td><strong>${dateStr}</strong></td>
+          <td style="white-space:pre-wrap; text-align:left;">${songsHTML}</td>
+          <td style="white-space:pre-wrap; text-align:left;">${colorsHTML}</td>
+        </tr>
+      `;
       });
 
       html += `</tbody></table></div>`;
@@ -728,39 +1029,37 @@
     }
 
     function attachCopyEvents() {
-  document.querySelectorAll('.copyable-song').forEach(el => {
-    el.removeEventListener('click', copySongHandler);
-    el.addEventListener('click', copySongHandler);
-  });
-}
+      document.querySelectorAll('.copyable-song').forEach(el => {
+        el.removeEventListener('click', copySongHandler);
+        el.addEventListener('click', copySongHandler);
+      });
+    }
 
-function copySongHandler(e) {
-  const text = this.textContent.replace(/^•\s*/, '').trim(); // убираем маркер
-  navigator.clipboard.writeText(text).then(() => {
-    // Визуальная обратная связь
-    const original = this.textContent;
-    this.textContent = '✅ ' + original;
-    setTimeout(() => {
-      this.textContent = original;
-    }, 1500);
-  }).catch(() => {
-    alert('Не удалось скопировать текст');
-  });
-}
+    function copySongHandler(e) {
+      const text = this.textContent.replace(/^•\s*/, '').trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const original = this.textContent;
+        this.textContent = '✅ ' + original;
+        setTimeout(() => {
+          this.textContent = original;
+        }, 1500);
+      }).catch(() => {
+        alert('Не удалось скопировать текст');
+      });
+    }
 
-    // ---------- Эмодзи для цвета ----------
     function getColorEmoji(colorName) {
       const colorMap = {
         'красный': '🔴', 'синий': '🔵', 'зеленый': '🟢', 'зелёный': '🟢',
         'желтый': '🟡', 'жёлтый': '🟡', 'оранжевый': '🟠', 'фиолетовый': '🟣',
         'розовый': '🌸', 'черный': '⚫', 'чёрный': '⚫', 'белый': '⚪',
-        'серый': '🔘', 'коричневый': '🟤', 'золотой': '🌟', 'серебряный': '✨'
+        'серый': '🔘', 'коричневый': '🟤'
       };
       const lower = colorName.toLowerCase().trim();
       return colorMap[lower] || '🎨';
     }
 
-    // ---------- Запуск ----------
+    // Запуск
     loadData();
   </script>
 </body>
