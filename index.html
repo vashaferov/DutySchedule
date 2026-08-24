@@ -29,10 +29,13 @@
           <button id="logout-btn"
             style="display:none; padding:4px 10px; border:none; border-radius:6px; background:var(--bg-cell); cursor:pointer;">Выйти</button>
         </div>
-        <button id="theme-toggle" class="theme-toggle">🌙</button>
         <button id="admin-panel-btn"
           style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">👥
           Управление пользователями</button>
+        <button id="manage-songs-btn"
+          style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#8b5cf6; color:#fff; cursor:pointer; font-size:0.9rem;">🎵
+          Песни</button>
+        <button id="theme-toggle" class="theme-toggle">🌙</button>
       </div>
     </div>
 
@@ -150,6 +153,54 @@
     </div>
   </div>
 
+  <!-- Модальное окно управления песнями -->
+  <div id="songs-modal"
+    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1003; justify-content:center; align-items:center;">
+    <div
+      style="background:var(--bg-card); padding:24px; border-radius:20px; max-width:700px; width:95%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <h3 style="margin-top:0;">🎵 Управление песнями</h3>
+      <div style="margin-bottom:16px;">
+        <h4>Добавить новую песню</h4>
+        <input type="text" id="new-song-name" placeholder="Название песни"
+          style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); margin-bottom:8px;">
+        <textarea id="new-song-text" placeholder="Текст песни (по желанию)" rows="3"
+          style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></textarea>
+        <button id="add-song-btn"
+          style="padding:6px 16px; border:none; border-radius:6px; background:#4f46e5; color:#fff; cursor:pointer; margin-top:8px;">Добавить</button>
+        <div id="add-song-error" style="color:#ef4444; font-size:0.9rem; margin-top:4px; display:none;"></div>
+      </div>
+      <div>
+        <h4>Редактировать песни</h4>
+        <div id="songs-list-container"></div>
+      </div>
+      <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
+        <button id="songs-modal-close"
+          style="padding:8px 16px; border:none; border-radius:8px; background:var(--bg-cell); cursor:pointer;">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно добавления песни в репертуар даты -->
+  <div id="add-repertoire-song-modal"
+    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1004; justify-content:center; align-items:center;">
+    <div
+      style="background:var(--bg-card); padding:24px; border-radius:20px; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <h3 style="margin-top:0;">🎵 Добавить песню на дату</h3>
+      <p style="color:var(--text-muted); font-size:0.9rem;">Выберите песню из списка</p>
+      <select id="repertoire-song-select"
+        style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); font-size:1rem; margin:12px 0;">
+        <option value="">— Выберите —</option>
+      </select>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button id="add-repertoire-song-cancel"
+          style="padding:8px 16px; border:none; border-radius:8px; background:var(--bg-cell); cursor:pointer;">Отмена</button>
+        <button id="add-repertoire-song-confirm"
+          style="padding:8px 16px; border:none; border-radius:8px; background:#4f46e5; color:#fff; cursor:pointer;">Добавить</button>
+      </div>
+      <div id="add-repertoire-song-error" style="color:#ef4444; font-size:0.9rem; margin-top:8px; display:none;"></div>
+    </div>
+  </div>
+
   <!-- Подключаем конфиг -->
   <script src="config.js"></script>
 
@@ -166,6 +217,7 @@
     let currentUser = '';
     let currentPin = '';
     let isAdmin = false;
+    let allSongs = [];
 
     // ---------- Глобальный индикатор загрузки ----------
     let loaderTimeout = null;
@@ -271,6 +323,13 @@
         userDisplay.style.display = 'none';
         logoutBtn.style.display = 'none';
         adminBtn.style.display = 'none';
+      }
+
+      const songsBtn = document.getElementById('manage-songs-btn');
+      if (currentUser && isAdmin) {
+        songsBtn.style.display = 'inline-block';
+      } else {
+        songsBtn.style.display = 'none';
       }
     }
 
@@ -507,6 +566,8 @@
       });
     });
 
+    document.getElementById('manage-songs-btn').addEventListener('click', showSongsModal);
+
     // ---------- Вкладки ----------
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', function () {
@@ -532,6 +593,222 @@
 
     function formatDateDisplay(dateStr) {
       return dateStr;
+    }
+
+    // ---------- Управление песнями ----------
+    async function loadSongs(adminName, adminPin) {
+      const url = `${API_URL}?action=getSongs&adminName=${encodeURIComponent(adminName)}&adminPin=${encodeURIComponent(adminPin)}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      return data.songs || [];
+    }
+
+    async function addNewSong(name, text, changer, pin) {
+      const body = `action=addSong&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&text=${encodeURIComponent(text)}`;
+      const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      return true;
+    }
+
+    async function updateSongTextOnServer(name, newText, changer, pin) {
+      const body = `action=updateSongText&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&newText=${encodeURIComponent(newText)}`;
+      const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      return true;
+    }
+
+    async function deleteSongOnServer(name, changer, pin) {
+      const body = `action=deleteSong&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}`;
+      const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      return true;
+    }
+
+    async function setRepertoireSongs(date, songNames, changer, pin) {
+      const body = `action=setRepertoireSongs&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&date=${encodeURIComponent(date)}&songs=${encodeURIComponent(songNames.join('\n'))}`;
+      const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      return true;
+    }
+
+    // ---------- Модальное окно управления песнями ----------
+    let currentRepertoireDate = '';
+
+    async function showSongsModal() {
+      if (!isAdmin) return;
+      const modal = document.getElementById('songs-modal');
+      const container = document.getElementById('songs-list-container');
+      const error = document.getElementById('add-song-error');
+      error.style.display = 'none';
+
+      showGlobalLoader();
+      let songs = [];
+      try {
+        songs = await loadSongs(currentUser, currentPin);
+      } catch (e) {
+        alert('Ошибка загрузки песен: ' + e.message);
+        hideGlobalLoader();
+        return;
+      } finally {
+        hideGlobalLoader();
+      }
+      allSongs = songs;
+
+      container.innerHTML = '';
+      if (songs.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);">Нет песен. Добавьте первую!</p>';
+      } else {
+        songs.forEach(song => {
+          const div = document.createElement('div');
+          div.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:8px;';
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = song.name;
+          nameSpan.style.cssText = 'flex:0 0 150px; font-weight:500;';
+          const textArea = document.createElement('textarea');
+          textArea.value = song.text;
+          textArea.style.cssText = 'flex:1; padding:4px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); min-height:40px;';
+          textArea.dataset.name = song.name;
+          const saveBtn = document.createElement('button');
+          saveBtn.textContent = 'Сохранить';
+          saveBtn.style.cssText = 'padding:4px 12px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;';
+          saveBtn.addEventListener('click', async () => {
+            const newText = textArea.value;
+            try {
+              showGlobalLoader();
+              await updateSongTextOnServer(song.name, newText, currentUser, currentPin);
+              alert('Текст обновлён');
+              await showSongsModal();
+            } catch (e) {
+              alert('Ошибка: ' + e.message);
+            } finally {
+              hideGlobalLoader();
+            }
+          });
+          const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = '🗑️';
+          deleteBtn.style.cssText = 'padding:4px 8px; border:none; border-radius:4px; background:#ef4444; color:#fff; cursor:pointer;';
+          deleteBtn.addEventListener('click', async () => {
+            if (!confirm('Удалить песню "' + song.name + '"?')) return;
+            try {
+              showGlobalLoader();
+              await deleteSongOnServer(song.name, currentUser, currentPin);
+              alert('Песня удалена');
+              await showSongsModal();
+            } catch (e) {
+              alert('Ошибка: ' + e.message);
+            } finally {
+              hideGlobalLoader();
+            }
+          });
+          div.appendChild(nameSpan);
+          div.appendChild(textArea);
+          div.appendChild(saveBtn);
+          div.appendChild(deleteBtn);
+          container.appendChild(div);
+        });
+      }
+
+      modal.style.display = 'flex';
+
+      document.getElementById('add-song-btn').onclick = async () => {
+        const nameInput = document.getElementById('new-song-name');
+        const textInput = document.getElementById('new-song-text');
+        const name = nameInput.value.trim();
+        const text = textInput.value.trim();
+        if (!name) {
+          document.getElementById('add-song-error').textContent = 'Введите название';
+          document.getElementById('add-song-error').style.display = 'block';
+          return;
+        }
+        document.getElementById('add-song-error').style.display = 'none';
+        try {
+          showGlobalLoader();
+          await addNewSong(name, text, currentUser, currentPin);
+          alert('Песня добавлена');
+          nameInput.value = '';
+          textInput.value = '';
+          await showSongsModal();
+        } catch (e) {
+          document.getElementById('add-song-error').textContent = e.message;
+          document.getElementById('add-song-error').style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      };
+
+      document.getElementById('songs-modal-close').onclick = () => modal.style.display = 'none';
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    }
+
+    // ---------- Модалка добавления песни в репертуар ----------
+    function openAddRepertoireSongModal(date) {
+      currentRepertoireDate = date;
+      const modal = document.getElementById('add-repertoire-song-modal');
+      const select = document.getElementById('repertoire-song-select');
+      const error = document.getElementById('add-repertoire-song-error');
+      error.style.display = 'none';
+      // Загружаем список всех песен (из allSongs)
+      if (!allSongs.length) {
+        loadSongs(currentUser, currentPin).then(songs => {
+          allSongs = songs;
+          fillRepertoireSongSelect(select);
+        }).catch(e => alert('Ошибка загрузки песен: ' + e.message));
+      } else {
+        fillRepertoireSongSelect(select);
+      }
+      modal.style.display = 'flex';
+    }
+
+    function fillRepertoireSongSelect(select) {
+      select.innerHTML = '<option value="">— Выберите —</option>';
+      allSongs.forEach(song => {
+        const opt = document.createElement('option');
+        opt.value = song.name;
+        opt.textContent = song.name;
+        select.appendChild(opt);
+      });
+    }
+
+    document.getElementById('add-repertoire-song-confirm').addEventListener('click', async () => {
+      const select = document.getElementById('repertoire-song-select');
+      const songName = select.value;
+      if (!songName) {
+        document.getElementById('add-repertoire-song-error').textContent = 'Выберите песню';
+        document.getElementById('add-repertoire-song-error').style.display = 'block';
+        return;
+      }
+      try {
+        showGlobalLoader();
+        const entry = repertoireData[currentRepertoireDate];
+        const currentSongs = entry ? entry.songs || [] : [];
+        const newSongs = [...currentSongs, { name: songName, text: '' }];
+        await setRepertoireSongs(currentRepertoireDate, newSongs.map(s => s.name), currentUser, currentPin);
+        await refreshRepertoire();
+        document.getElementById('add-repertoire-song-modal').style.display = 'none';
+        alert('Песня добавлена');
+      } catch (e) {
+        alert('Ошибка: ' + e.message);
+      } finally {
+        hideGlobalLoader();
+      }
+    });
+
+    document.getElementById('add-repertoire-song-cancel').addEventListener('click', () => {
+      document.getElementById('add-repertoire-song-modal').style.display = 'none';
+    });
+
+    // ---------- Обновление репертуара ----------
+    async function refreshRepertoire() {
+      const resp = await fetch(API_URL);
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      repertoireData = data.repertoire || {};
+      renderRepertoire();
     }
 
     // ---------- Загрузка данных ----------
@@ -1051,6 +1328,17 @@
       });
 
       attachCopyEvents();
+      attachRepertoireEvents();
+
+      container.querySelectorAll('.add-song-to-date-btn').forEach(btn => {
+        btn.removeEventListener('click', addSongToDateHandler);
+        btn.addEventListener('click', addSongToDateHandler);
+      });
+    }
+
+    function addSongToDateHandler(e) {
+      const date = this.dataset.date;
+      openAddRepertoireSongModal(date);
     }
 
     function renderRepertoirePast() {
@@ -1061,46 +1349,104 @@
       }
       container.innerHTML = buildRepertoireTableHTML(repertoirePast, true);
       attachCopyEvents();
+      attachRepertoireEvents();
+    }
+
+    function attachRepertoireEvents() {
+      // Копирование текста
+      document.querySelectorAll('.copy-song-text-btn').forEach(btn => {
+        btn.removeEventListener('click', copySongTextHandler);
+        btn.addEventListener('click', copySongTextHandler);
+      });
+      // Удаление песни из репертуара (только админ)
+      if (isAdmin) {
+        document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
+          btn.removeEventListener('click', deleteRepertoireSongHandler);
+          btn.addEventListener('click', deleteRepertoireSongHandler);
+        });
+      }
+    }
+
+    async function copySongTextHandler(e) {
+      const text = this.dataset.text;
+      try {
+        await navigator.clipboard.writeText(text);
+        const original = this.textContent;
+        this.textContent = '✅ Скопировано!';
+        setTimeout(() => { this.textContent = original; }, 2000);
+      } catch (err) {
+        alert('Не удалось скопировать текст');
+      }
+    }
+
+    async function deleteRepertoireSongHandler(e) {
+      const date = this.dataset.date;
+      const songName = this.dataset.song;
+      if (!confirm(`Удалить песню "${songName}" с даты ${date}?`)) return;
+      try {
+        showGlobalLoader();
+        const entry = repertoireData[date];
+        if (!entry) throw new Error('Дата не найдена');
+        const currentSongs = entry.songs || [];
+        const newSongs = currentSongs.filter(s => s.name !== songName);
+        await setRepertoireSongs(date, newSongs.map(s => s.name), currentUser, currentPin);
+        await refreshRepertoire();
+        alert('Песня удалена из репертуара');
+      } catch (e) {
+        alert('Ошибка: ' + e.message);
+      } finally {
+        hideGlobalLoader();
+      }
     }
 
     function buildRepertoireTableHTML(items, isArchive = false) {
       if (!items || items.length === 0) return '';
-      let html = `
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>Дата</th>
-            <th>Песни</th>
-            <th>Цвета</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
+      let html = '<div class="repertoire-grid">';
 
       items.forEach(item => {
         const dateStr = item.dateStr;
         const songs = item.songs || [];
         const colors = item.colors || [];
 
-        const songsHTML = songs.length
-          ? songs.map(song => `<span class="copyable-song" title="Кликните для копирования">• ${song}</span>`).join('\n')
-          : '—';
-
-        const colorsHTML = colors.length
-          ? colors.map(c => `• ${getColorEmoji(c)} ${c}`).join('\n')
-          : '—';
-
         html += `
-        <tr>
-          <td><strong>${dateStr}</strong></td>
-          <td style="white-space:pre-wrap; text-align:left;">${songsHTML}</td>
-          <td style="white-space:pre-wrap; text-align:left;">${colorsHTML}</td>
-        </tr>
-      `;
+      <div class="repertoire-card">
+        <div class="repertoire-card-header">
+          <span class="repertoire-date">${dateStr}</span>
+          ${isArchive ? '<span class="repertoire-archive-badge">📦 Архив</span>' : ''}
+        </div>
+        <div class="repertoire-card-body">
+          <div class="repertoire-songs">
+            <div class="repertoire-section-title">🎵 Песни</div>
+            ${songs.length ? songs.map(song => `
+              <div class="repertoire-song-item">
+                <span class="song-name">• ${song.name}</span>
+                <div class="song-actions">
+                  ${song.text ? `<button class="copy-song-text-btn" data-text="${song.text.replace(/"/g, '&quot;')}" title="Копировать текст">📋</button>` : ''}
+                  ${!isArchive && isAdmin ? `<button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>` : ''}
+                </div>
+              </div>
+            `).join('') : '<div class="repertoire-empty">—</div>'}
+          </div>
+          <div class="repertoire-colors">
+            <div class="repertoire-section-title">🎨 Цвета</div>
+            ${colors.length ? colors.map(c => `
+              <span class="repertoire-color-item">
+                <span class="color-dot" style="background:${c.toLowerCase()}"></span>
+                ${c}
+              </span>
+            `).join('') : '<div class="repertoire-empty">—</div>'}
+          </div>
+        </div>
+        ${!isArchive && isAdmin ? `
+          <div class="repertoire-card-footer">
+            <button class="add-song-to-date-btn" data-date="${dateStr}">+ Добавить песню</button>
+          </div>
+        ` : ''}
+      </div>
+    `;
       });
 
-      html += `</tbody></table></div>`;
+      html += '</div>';
       return html;
     }
 
