@@ -14,6 +14,14 @@
   --bg-info: #f1f5f9;
   --bg-total: #eef2ff;
   --bg-row-full: #f0fdf4;
+  --bg-cell-selected-hover: #bfdbfe;
+  --border-selected: #3b82f6;
+  --shadow-selected: rgba(59, 130, 246, 0.3);
+  --text-selected: #1d4ed8;
+  --bg-cell-empty: #f1f5f9;
+  --bg-cell-empty-hover: #e2e8f0;
+  --bg-cell-disabled-selected: #b3c7e8;
+  --bg-row-has-duty: #f8fafc;
 }
 
 [data-theme="dark"] {
@@ -31,6 +39,14 @@
   --bg-info: #2d3a4f;
   --bg-total: #2d3a4f;
   --bg-row-full: #2d4a3f;
+  --bg-cell-selected-hover: #4b5a7b;
+  --border-selected: #60a5fa;
+  --shadow-selected: rgba(96, 165, 250, 0.4);
+  --text-selected: #93c5fd;
+  --bg-cell-empty: #2d3a4f;
+  --bg-cell-empty-hover: #3d4a5f;
+  --bg-cell-disabled-selected: #2a3a55;
+  --bg-row-has-duty: #1e293b;
 }
 
 /* ---------- Базовые сбросы ---------- */
@@ -219,38 +235,58 @@ tbody td:first-child {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  font-weight: 500;
+  border-radius: 12px;
+  font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   border: 2px solid transparent;
   user-select: none;
-  background: var(--bg-cell);
+  background: var(--bg-cell-empty);
   color: var(--text-muted);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 .cell.selected {
-  background: var(--bg-cell-selected);
-  border-color: #4f46e5;
-  color: #4f46e5;
-  box-shadow: 0 4px 6px -2px rgba(79,70,229,0.2);
+  background: var(--bg-cell-selected) !important;
+  border-color: var(--border-selected) !important;
+  color: var(--text-selected) !important;
+  box-shadow: 0 4px 12px var(--shadow-selected), inset 0 0 0 1px rgba(255,255,255,0.3);
+  transform: scale(1.02);
+  /* animation: pulse-glow 5s infinite ease-in-out; */
 }
+
 .cell.selected:hover {
-  background: #c7d2fe;
-  transform: scale(1.05);
+  background: var(--bg-cell-selected-hover) !important;
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px var(--shadow-selected);
 }
 .cell:not(.selected):not(.disabled):hover {
-  background: var(--bg-cell-hover);
+  background: var(--bg-cell-empty-hover);
   transform: scale(1.05);
   border-color: var(--border-color);
 }
 .cell.disabled {
-  background: var(--bg-cell);
-  color: var(--text-muted);
   cursor: not-allowed;
-  opacity: 0.5;
-  border-color: transparent;
   pointer-events: none;
+  opacity: 0.7;
+  border-color: transparent;
+}
+.cell.disabled:not(.selected) {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 0.5;
+  background: var(--bg-cell-empty);
+  border-color: transparent;
+}
+.cell.selected.disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+  background: var(--bg-cell-disabled-selected) !important;
+  border-color: var(--border-selected) !important;
+  color: var(--text-selected) !important;
+  opacity: 0.7;
+  animation: none;
+  box-shadow: 0 2px 6px var(--shadow-selected);
 }
 .cell.archive-cell {
   background: var(--bg-cell);
@@ -259,6 +295,7 @@ tbody td:first-child {
   border-color: var(--border-color);
   pointer-events: none;
 }
+
 tbody tr.row-full td:first-child {
   background: var(--bg-row-full);
 }
@@ -269,6 +306,24 @@ tbody tr.row-full td:first-child .progress-fill {
   background: #22c55e;
 }
 .cell:active:not(.disabled) { transform: scale(0.92); }
+
+/* Анимация пульсации для выбранных ячеек */
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 4px 12px var(--shadow-selected), inset 0 0 0 1px rgba(255,255,255,0.2);
+  }
+  50% {
+    box-shadow: 0 6px 20px var(--shadow-selected), inset 0 0 0 2px rgba(255,255,255,0.4);
+  }
+  100% {
+    box-shadow: 0 4px 12px var(--shadow-selected), inset 0 0 0 1px rgba(255,255,255,0.2);
+  }
+}
+
+/* Подсветка строки, если есть хотя бы один дежурный */
+tbody tr:has(.cell.selected) td:first-child {
+  background: var(--bg-row-has-duty) !important;
+}
 
 /* ---------- Пагинация ---------- */
 .pagination {
@@ -640,4 +695,18 @@ tbody tr.row-full td:first-child .progress-fill {
 #login-modal input,
 #login-modal select {
   font-size: 1rem;
+}
+
+/* Глобальный индикатор загрузки */
+#global-loader .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

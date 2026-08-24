@@ -9,6 +9,15 @@
 </head>
 
 <body>
+  <!-- Глобальный индикатор загрузки -->
+  <div id="global-loader"
+    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+    <div
+      style="background:var(--bg-card); padding:24px; border-radius:20px; display:flex; flex-direction:column; align-items:center; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div class="spinner" style="width:40px; height:40px;"></div>
+      <p style="margin-top:16px; color:var(--text-primary); font-weight:500;">Загрузка...</p>
+    </div>
+  </div>
   <div class="container">
     <!-- Шапка -->
     <div class="header">
@@ -158,6 +167,29 @@
     let currentPin = '';
     let isAdmin = false;
 
+    // ---------- Глобальный индикатор загрузки ----------
+    let loaderTimeout = null;
+
+    function showGlobalLoader() {
+      const loader = document.getElementById('global-loader');
+      loader.style.display = 'flex';
+      // Автоматическое скрытие через 10 секунд (на случай ошибки)
+      if (loaderTimeout) clearTimeout(loaderTimeout);
+      loaderTimeout = setTimeout(() => {
+        hideGlobalLoader();
+        alert('Превышено время ожидания ответа от сервера. Попробуйте ещё раз.');
+      }, 10000);
+    }
+
+    function hideGlobalLoader() {
+      const loader = document.getElementById('global-loader');
+      loader.style.display = 'none';
+      if (loaderTimeout) {
+        clearTimeout(loaderTimeout);
+        loaderTimeout = null;
+      }
+    }
+
     // ---------- Инициализация темы ----------
     document.getElementById('max-info').textContent = MAX_PER_DAY;
 
@@ -302,7 +334,19 @@
       const cancelBtn = document.getElementById('login-cancel');
 
       // Загружаем список имён (массив строк)
-      const namesList = await loadUsers();
+      showGlobalLoader();
+      let namesList = [];
+      try {
+        namesList = await loadUsers();
+      } catch (e) {
+        console.error('Ошибка загрузки пользователей:', e);
+        alert('Не удалось загрузить список пользователей. Проверьте соединение.');
+        hideGlobalLoader();
+        return;
+      } finally {
+        hideGlobalLoader();
+      }
+
       select.innerHTML = '<option value="">— Выберите —</option>';
       namesList.forEach(name => {
         const opt = document.createElement('option');
@@ -329,10 +373,15 @@
           error.style.display = 'block';
           return;
         }
+        // Меняем текст кнопки
+        const originalText = confirmBtn.textContent;
+        confirmBtn.textContent = '⏳ Проверка...';
+        confirmBtn.disabled = true;
+        showGlobalLoader();
+
         try {
           const valid = await verifyPinOnServer(name, pin);
           if (valid) {
-            // Определяем роль (администратор или нет)
             let admin = false;
             try {
               const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(name)}&adminPin=${encodeURIComponent(pin)}`);
@@ -351,6 +400,10 @@
           error.textContent = 'Ошибка проверки PIN';
           error.style.display = 'block';
           console.error(e);
+        } finally {
+          hideGlobalLoader();
+          confirmBtn.textContent = originalText;
+          confirmBtn.disabled = false;
         }
       };
 
@@ -372,70 +425,86 @@
     // ---------- Управление пользователями (админ) ----------
     document.getElementById('admin-panel-btn').addEventListener('click', async function () {
       if (!isAdmin) return;
+      showGlobalLoader();
+      let userList = [];
       try {
-        const userList = await loadUsersForAdmin(currentUser, currentPin);
-        const modal = document.getElementById('admin-modal');
-        const container = document.getElementById('admin-user-list');
-        const error = document.getElementById('admin-modal-error');
-        error.style.display = 'none';
-        let html = '<table style="width:100%; border-collapse:collapse;">';
-        html += '<tr><th style="text-align:left; padding:8px;">Имя</th><th style="text-align:left; padding:8px;">Новый PIN</th><th style="text-align:left; padding:8px;">Действие</th></tr>';
-        userList.forEach(u => {
-          html += `
-          <tr>
-            <td style="padding:8px;">${u.name}</td>
-            <td style="padding:8px;"><input type="text" class="admin-pin-input" data-name="${u.name}" placeholder="Введите новый PIN" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></td>
-            <td style="padding:8px;"><button class="admin-save-pin" data-name="${u.name}" style="padding:6px 14px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;">Сохранить</button></td>
-          </tr>
-        `;
-        });
-        html += '</table>';
-        container.innerHTML = html;
-        modal.style.display = 'flex';
-
-        container.querySelectorAll('.admin-save-pin').forEach(btn => {
-          btn.addEventListener('click', async function () {
-            const name = this.dataset.name;
-            const input = document.querySelector(`.admin-pin-input[data-name="${name}"]`);
-            const newPin = input.value.trim();
-            if (!newPin) {
-              error.textContent = 'PIN не может быть пустым';
-              error.style.display = 'block';
-              return;
-            }
-            error.style.display = 'none';
-            try {
-              const resp = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=setPin&name=${encodeURIComponent(name)}&newPin=${encodeURIComponent(newPin)}&adminName=${encodeURIComponent(currentUser)}&adminPin=${encodeURIComponent(currentPin)}`
-              });
-              const result = await resp.json();
-              if (result.error) {
-                error.textContent = result.error;
-                error.style.display = 'block';
-              } else {
-                alert('PIN для ' + name + ' успешно обновлён!');
-                document.getElementById('admin-modal-close').click();
-                // Обновим список
-                document.getElementById('admin-panel-btn').click();
-              }
-            } catch (e) {
-              error.textContent = 'Ошибка сохранения: ' + e.message;
-              error.style.display = 'block';
-            }
-          });
-        });
-
-        document.getElementById('admin-modal-close').onclick = function () {
-          modal.style.display = 'none';
-        };
-        modal.addEventListener('click', function (e) {
-          if (e.target === this) modal.style.display = 'none';
-        });
+        userList = await loadUsersForAdmin(currentUser, currentPin);
       } catch (e) {
         alert('Ошибка загрузки пользователей: ' + e.message);
+        hideGlobalLoader();
+        return;
+      } finally {
+        hideGlobalLoader();
       }
+
+      const modal = document.getElementById('admin-modal');
+      const container = document.getElementById('admin-user-list');
+      const error = document.getElementById('admin-modal-error');
+      error.style.display = 'none';
+      let html = '<table style="width:100%; border-collapse:collapse;">';
+      html += '<tr><th style="text-align:left; padding:8px;">Имя</th><th style="text-align:left; padding:8px;">Новый PIN</th><th style="text-align:left; padding:8px;">Действие</th></tr>';
+      userList.forEach(u => {
+        html += `
+      <tr>
+        <td style="padding:8px;">${u.name}</td>
+        <td style="padding:8px;"><input type="text" class="admin-pin-input" data-name="${u.name}" placeholder="Введите новый PIN" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></td>
+        <td style="padding:8px;"><button class="admin-save-pin" data-name="${u.name}" style="padding:6px 14px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;">Сохранить</button></td>
+      </tr>
+    `;
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      modal.style.display = 'flex';
+
+      container.querySelectorAll('.admin-save-pin').forEach(btn => {
+        btn.addEventListener('click', async function () {
+          const name = this.dataset.name;
+          const input = document.querySelector(`.admin-pin-input[data-name="${name}"]`);
+          const newPin = input.value.trim();
+          if (!newPin) {
+            error.textContent = 'PIN не может быть пустым';
+            error.style.display = 'block';
+            return;
+          }
+          error.style.display = 'none';
+          const originalText = this.textContent;
+          this.textContent = '⏳ Сохранение...';
+          this.disabled = true;
+          showGlobalLoader();
+          try {
+            const resp = await fetch(API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: `action=setPin&name=${encodeURIComponent(name)}&newPin=${encodeURIComponent(newPin)}&adminName=${encodeURIComponent(currentUser)}&adminPin=${encodeURIComponent(currentPin)}`
+            });
+            const result = await resp.json();
+            if (result.error) {
+              error.textContent = result.error;
+              error.style.display = 'block';
+            } else {
+              alert('PIN для ' + name + ' успешно обновлён!');
+              document.getElementById('admin-modal-close').click();
+              // Обновим список
+              document.getElementById('admin-panel-btn').click();
+            }
+          } catch (e) {
+            error.textContent = 'Ошибка сохранения: ' + e.message;
+            error.style.display = 'block';
+            console.error(e);
+          } finally {
+            hideGlobalLoader();
+            this.textContent = originalText;
+            this.disabled = false;
+          }
+        });
+      });
+
+      document.getElementById('admin-modal-close').onclick = function () {
+        modal.style.display = 'none';
+      };
+      modal.addEventListener('click', function (e) {
+        if (e.target === this) modal.style.display = 'none';
+      });
     });
 
     // ---------- Вкладки ----------
@@ -472,8 +541,8 @@
       const archiveSection = document.getElementById('archive-section');
       const statsSection = document.getElementById('stats-section');
 
+      showGlobalLoader();
       try {
-        // Основной запрос – без пользователей
         const resp = await fetch(API_URL);
         if (!resp.ok) throw new Error('Ошибка загрузки');
         const data = await resp.json();
@@ -526,6 +595,8 @@
       } catch (e) {
         loading.innerHTML = `<div style="color:#ef4444; padding:20px;">❌ ${e.message}</div>`;
         console.error(e);
+      } finally {
+        hideGlobalLoader();
       }
     }
 
@@ -722,11 +793,13 @@
         : `Вы уверены, что хотите назначить ${name} на ${date}?`;
       if (!confirm(confirmMessage)) return;
 
+      // Оптимистичное обновление UI
       cell.dataset.checked = String(newValue);
       cell.textContent = newValue ? '✔' : '•';
       newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
       updateRowStates('main-table-container');
 
+      showGlobalLoader(); // Показываем спиннер
       try {
         const params = new URLSearchParams();
         params.append('date', date);
@@ -742,11 +815,14 @@
         });
       } catch (e) {
         alert('Ошибка сохранения. Попробуйте ещё раз.');
+        // Откат
         cell.dataset.checked = String(currentChecked);
         cell.textContent = currentChecked ? '✔' : '•';
         currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
         updateRowStates('main-table-container');
         console.error(e);
+      } finally {
+        hideGlobalLoader();
       }
     }
 
