@@ -4,14 +4,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>График дежурств</title>
+  <title>MediaHLG</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
   <!-- Глобальный индикатор загрузки -->
   <div id="global-loader"
-    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
     <div
       style="background:var(--bg-card); padding:24px; border-radius:20px; display:flex; flex-direction:column; align-items:center; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
       <div class="spinner" style="width:40px; height:40px;"></div>
@@ -21,7 +21,7 @@
   <div class="container">
     <!-- Шапка -->
     <div class="header">
-      <h1>📅 График дежурств</h1>
+      <h1>MediaHLG</h1>
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <div id="auth-section" style="display:flex; align-items:center; gap:8px;">
           <button id="login-btn" class="auth-btn">🔑 Войти</button>
@@ -32,9 +32,7 @@
         <button id="admin-panel-btn"
           style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">👥
           Управление пользователями</button>
-        <button id="manage-songs-btn"
-          style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#8b5cf6; color:#fff; cursor:pointer; font-size:0.9rem;">🎵
-          Песни</button>
+        
         <button id="theme-toggle" class="theme-toggle">🌙</button>
       </div>
     </div>
@@ -73,13 +71,7 @@
         <div id="main-pagination" class="pagination"></div>
       </div>
 
-      <div id="archive-section" class="section" style="display:none;">
-        <div class="section-title">
-          📦 Архив
-          <span class="count" id="archive-count"></span>
-        </div>
-        <div id="archive-table-container" class="archive-table"></div>
-      </div>
+
 
       <div id="stats-section" class="section" style="display:none;">
         <div class="section-title">
@@ -91,6 +83,14 @@
           <canvas id="chartCanvas" width="400" height="400"></canvas>
         </div>
       </div>
+
+      <div id="archive-section" class="section" style="display:none;">
+        <div class="section-title">
+          📦 Архив
+          <span class="count" id="archive-count"></span>
+        </div>
+        <div id="archive-table-container" class="archive-table"></div>
+      </div>
     </div>
 
     <!-- Вкладка: Репертуар -->
@@ -99,834 +99,885 @@
         <div class="section-title">
           🎵 Актуальный репертуар
           <span class="count" id="repertoire-future-count"></span>
+          <button id="manage-songs-btn"
+          style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">🎵
+          Управление песнями</button>
         </div>
         <div id="repertoire-future-container"></div>
         <div id="repertoire-pagination" class="pagination"></div>
       </div>
-
-      <div class="section">
-        <div class="section-title">
-          📦 Архив репертуара
-          <span class="count" id="repertoire-past-count"></span>
-        </div>
-        <div id="repertoire-past-container" class="archive-table"></div>
-      </div>
     </div>
 
     <!-- Модальное окно входа -->
-    <div id="login-modal"
-      style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1002; justify-content:center; align-items:center;">
-      <div
-        style="background:var(--bg-card); padding:24px; border-radius:20px; max-width:360px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-        <h3 style="margin-top:0;">🔐 Вход в систему</h3>
-        <label style="display:block; margin-top:12px;">Выберите пользователя</label>
-        <select id="login-user-select"
-          style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); font-size:1rem;">
-          <option value="">— Выберите —</option>
-        </select>
-        <label style="display:block; margin-top:12px;">PIN-код</label>
-        <input type="password" id="login-pin-input" placeholder="Введите PIN"
-          style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); font-size:1rem; margin-top:4px;">
-        <div style="display:flex; gap:8px; margin-top:16px; justify-content:flex-end;">
-          <button id="login-cancel"
-            style="padding:8px 16px; border:none; border-radius:8px; background:var(--bg-cell); cursor:pointer;">Отмена</button>
-          <button id="login-confirm"
-            style="padding:8px 16px; border:none; border-radius:8px; background:#4f46e5; color:#fff; cursor:pointer;">Войти</button>
+    <div id="login-modal" class="modal-overlay">
+      <div class="modal-content small">
+        <div class="modal-header">
+          <h3>🔐 Вход в систему</h3>
+          <button class="modal-close-btn" id="login-close-btn">✕</button>
         </div>
-        <div id="login-error" style="color:#ef4444; font-size:0.9rem; margin-top:8px; display:none;"></div>
+        <div class="modal-body">
+          <label style="display:block; margin-top:8px;">Выберите пользователя</label>
+          <select id="login-user-select" class="modal-select">
+            <option value="">— Выберите —</option>
+          </select>
+          <label style="display:block; margin-top:12px;">PIN-код</label>
+          <input type="password" id="login-pin-input" placeholder="Введите PIN" class="modal-input">
+          <div id="login-error" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="login-cancel">Отмена</button>
+          <button class="btn-primary" id="login-confirm">Войти</button>
+        </div>
       </div>
     </div>
 
     <!-- Модальное окно управления пользователями (админ) -->
-    <div id="admin-modal"
-      style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1001; justify-content:center; align-items:center;">
-      <div
-        style="background:var(--bg-card); padding:24px; border-radius:20px; max-width:700px; width:95%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-        <h3 style="margin-top:0;">👥 Управление пользователями</h3>
-        <div id="admin-user-list"></div>
-        <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
-          <button id="admin-modal-close"
-            style="padding:8px 16px; border:none; border-radius:8px; background:var(--bg-cell); cursor:pointer;">Закрыть</button>
+    <div id="admin-modal" class="modal-overlay">
+      <div class="modal-content wide">
+        <div class="modal-header">
+          <h3>👥 Управление пользователями</h3>
+          <button class="modal-close-btn" id="admin-modal-close">✕</button>
         </div>
-        <div id="admin-modal-error" style="color:#ef4444; font-size:0.9rem; margin-top:8px; display:none;"></div>
+        <div class="modal-body">
+          <div id="admin-user-list"></div>
+          <div id="admin-modal-error" class="modal-error"></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Модальное окно управления песнями -->
-  <div id="songs-modal"
-    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1003; justify-content:center; align-items:center;">
-    <div
-      style="background:var(--bg-card); padding:24px; border-radius:20px; max-width:700px; width:95%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-      <h3 style="margin-top:0;">🎵 Управление песнями</h3>
-      <div style="margin-bottom:16px;">
-        <h4>Добавить новую песню</h4>
-        <input type="text" id="new-song-name" placeholder="Название песни"
-          style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); margin-bottom:8px;">
-        <textarea id="new-song-text" placeholder="Текст песни (по желанию)" rows="3"
-          style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></textarea>
-        <button id="add-song-btn"
-          style="padding:6px 16px; border:none; border-radius:6px; background:#4f46e5; color:#fff; cursor:pointer; margin-top:8px;">Добавить</button>
-        <div id="add-song-error" style="color:#ef4444; font-size:0.9rem; margin-top:4px; display:none;"></div>
-      </div>
-      <div>
-        <h4>Редактировать песни</h4>
-        <div id="songs-list-container"></div>
-      </div>
-      <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
-        <button id="songs-modal-close"
-          style="padding:8px 16px; border:none; border-radius:8px; background:var(--bg-cell); cursor:pointer;">Закрыть</button>
+    <!-- Модальное окно управления песнями -->
+    <div id="songs-modal" class="modal-overlay">
+      <div class="modal-content wide">
+        <div class="modal-header">
+          <h3>🎵 Управление песнями</h3>
+          <button class="modal-close-btn" id="songs-modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="margin-bottom:20px;">
+            <h4 style="margin-bottom:8px;">Добавить новую песню</h4>
+            <input type="text" id="new-song-name" placeholder="Название песни" class="modal-input">
+            <textarea id="new-song-text" placeholder="Текст песни (по желанию)" rows="3"
+              class="modal-textarea"></textarea>
+            <button id="add-song-btn" class="btn-primary" style="margin-top:8px;">Добавить</button>
+            <div id="add-song-error" class="modal-error"></div>
+          </div>
+          <div>
+            <h4 style="margin-bottom:8px;">Редактировать песни</h4>
+            <input type="text" id="songs-filter-input" placeholder="Фильтр по названию" class="modal-input"
+              style="margin-bottom:8px;">
+            <div id="songs-list-container"></div>
+            <div id="songs-pagination" class="pagination" style="margin-top:12px;"></div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Модальное окно добавления песни в репертуар даты -->
-  <div id="add-repertoire-song-modal"
-    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1004; justify-content:center; align-items:center;">
-    <div
-      style="background:var(--bg-card); padding:24px; border-radius:20px; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-      <h3 style="margin-top:0;">🎵 Добавить песню на дату</h3>
-      <p style="color:var(--text-muted); font-size:0.9rem;">Выберите песню из списка</p>
-      <select id="repertoire-song-select"
-        style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); font-size:1rem; margin:12px 0;">
-        <option value="">— Выберите —</option>
-      </select>
-      <div style="display:flex; gap:8px; justify-content:flex-end;">
-        <button id="add-repertoire-song-cancel"
-          style="padding:8px 16px; border:none; border-radius:8px; background:var(--bg-cell); cursor:pointer;">Отмена</button>
-        <button id="add-repertoire-song-confirm"
-          style="padding:8px 16px; border:none; border-radius:8px; background:#4f46e5; color:#fff; cursor:pointer;">Добавить</button>
+    <!-- Модальное окно добавления песни в репертуар даты -->
+    <div id="add-repertoire-song-modal" class="modal-overlay">
+      <div class="modal-content small">
+        <div class="modal-header">
+          <h3>🎵 Добавить песню на дату</h3>
+          <button class="modal-close-btn" id="add-repertoire-song-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="color:var(--text-muted); font-size:0.9rem;">Выберите песню из списка</p>
+          <select id="repertoire-song-select" class="modal-select">
+            <option value="">— Выберите —</option>
+          </select>
+          <div id="add-repertoire-song-error" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="add-repertoire-song-cancel">Отмена</button>
+          <button class="btn-primary" id="add-repertoire-song-confirm">Добавить</button>
+        </div>
       </div>
-      <div id="add-repertoire-song-error" style="color:#ef4444; font-size:0.9rem; margin-top:8px; display:none;"></div>
     </div>
-  </div>
 
-  <!-- Подключаем конфиг -->
-  <script src="config.js"></script>
+    <!-- Подключаем конфиг -->
+    <script src="config.js"></script>
 
-  <script>
-    // ---------- Глобальные переменные ----------
-    let allDates = [];
-    let futureDates = [];
-    let pastDates = [];
-    let currentPage = 0;
-    let repertoireData = {};
-    let repertoireFuture = [];
-    let repertoirePast = [];
-    let repertoireCurrentPage = 0;
-    let currentUser = '';
-    let currentPin = '';
-    let isAdmin = false;
-    let allSongs = [];
+    <script>
+      // ---------- Глобальные переменные ----------
+      let allDates = [];
+      let futureDates = [];
+      let pastDates = [];
+      let currentPage = 0;
+      let repertoireData = {};
+      let repertoireFuture = [];
+      let repertoirePast = [];
+      let repertoireCurrentPage = 0;
+      let currentUser = '';
+      let currentPin = '';
+      let isAdmin = false;
+      let allSongs = [];
+      let songsCurrentPage = 0;
+      let filteredSongs = [];
 
-    // ---------- Глобальный индикатор загрузки ----------
-    let loaderTimeout = null;
+      // ---------- Глобальный индикатор загрузки ----------
+      let loaderTimeout = null;
 
-    function showGlobalLoader() {
-      const loader = document.getElementById('global-loader');
-      loader.style.display = 'flex';
-      // Автоматическое скрытие через 10 секунд (на случай ошибки)
-      if (loaderTimeout) clearTimeout(loaderTimeout);
-      loaderTimeout = setTimeout(() => {
-        hideGlobalLoader();
-        alert('Превышено время ожидания ответа от сервера. Попробуйте ещё раз.');
-      }, 10000);
-    }
-
-    function hideGlobalLoader() {
-      const loader = document.getElementById('global-loader');
-      loader.style.display = 'none';
-      if (loaderTimeout) {
-        clearTimeout(loaderTimeout);
-        loaderTimeout = null;
-      }
-    }
-
-    // ---------- Инициализация темы ----------
-    document.getElementById('max-info').textContent = MAX_PER_DAY;
-
-    function getSystemTheme() {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-
-    function applyTheme(theme) {
-      document.documentElement.setAttribute('data-theme', theme);
-      localStorage.setItem('theme', theme);
-      const btn = document.getElementById('theme-toggle');
-      if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
-    }
-
-    function toggleTheme() {
-      const current = document.documentElement.getAttribute('data-theme') || 'light';
-      const next = current === 'light' ? 'dark' : 'light';
-      applyTheme(next);
-    }
-
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      applyTheme(savedTheme);
-    } else {
-      applyTheme(getSystemTheme());
-    }
-
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-      if (!localStorage.getItem('theme')) {
-        applyTheme(e.matches ? 'dark' : 'light');
-      }
-    });
-
-    document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-
-    // ---------- API-вызовы ----------
-    async function verifyPinOnServer(name, pin) {
-      const url = API_URL + '?action=verifyPin&name=' + encodeURIComponent(name) + '&pin=' + encodeURIComponent(pin);
-      const resp = await fetch(url);
-      const data = await resp.json();
-      return data.success === true;
-    }
-
-    async function loadUsers() {
-      const resp = await fetch(API_URL + '?action=getUserNames');
-      const data = await resp.json();
-      if (data.error) {
-        console.error('Ошибка загрузки пользователей:', data.error);
-        return [];
-      }
-      return data.names || [];
-    }
-
-    async function loadUsersForAdmin(adminName, adminPin) {
-      const url = `${API_URL}?action=getUsers&adminName=${encodeURIComponent(adminName)}&adminPin=${encodeURIComponent(adminPin)}`;
-      const resp = await fetch(url);
-      const data = await resp.json();
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      return data.users || [];
-    }
-
-    // ---------- Авторизация ----------
-    function updateAuthUI() {
-      const loginBtn = document.getElementById('login-btn');
-      const userDisplay = document.getElementById('user-display');
-      const logoutBtn = document.getElementById('logout-btn');
-      const adminBtn = document.getElementById('admin-panel-btn');
-
-      if (currentUser) {
-        loginBtn.style.display = 'none';
-        userDisplay.textContent = '👤 ' + currentUser;
-        userDisplay.style.display = 'inline';
-        logoutBtn.style.display = 'inline';
-        adminBtn.style.display = isAdmin ? 'inline-block' : 'none';
-      } else {
-        loginBtn.style.display = 'inline';
-        userDisplay.style.display = 'none';
-        logoutBtn.style.display = 'none';
-        adminBtn.style.display = 'none';
+      function showGlobalLoader() {
+        const loader = document.getElementById('global-loader');
+        loader.style.display = 'flex';
+        if (loaderTimeout) clearTimeout(loaderTimeout);
+        loaderTimeout = setTimeout(() => {
+          hideGlobalLoader();
+        }, 10000);
       }
 
-      const songsBtn = document.getElementById('manage-songs-btn');
-      if (currentUser && isAdmin) {
-        songsBtn.style.display = 'inline-block';
-      } else {
-        songsBtn.style.display = 'none';
-      }
-    }
-
-    function setUser(name, pin, admin) {
-      currentUser = name;
-      currentPin = pin;
-      isAdmin = admin;
-      localStorage.setItem('currentUser', name);
-      localStorage.setItem('currentUserPin', pin);
-      updateAuthUI();
-      updateRowStates('main-table-container');
-    }
-
-    function logoutUser() {
-      currentUser = '';
-      currentPin = '';
-      isAdmin = false;
-      localStorage.removeItem('currentUser');
-      localStorage.removeItem('currentUserPin');
-      updateAuthUI();
-      updateRowStates('main-table-container');
-    }
-
-    // Попытка автоматического входа при загрузке
-    async function autoLogin() {
-      const savedUser = localStorage.getItem('currentUser');
-      const savedPin = localStorage.getItem('currentUserPin');
-      if (!savedUser || !savedPin) return;
-      const valid = await verifyPinOnServer(savedUser, savedPin);
-      if (valid) {
-        // Проверяем, является ли пользователь администратором
-        try {
-          const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(savedUser)}&adminPin=${encodeURIComponent(savedPin)}`);
-          const data = await resp.json();
-          if (!data.error) {
-            // Пользователь админ
-            isAdmin = true;
-          } else {
-            isAdmin = false;
-          }
-        } catch (e) {
-          isAdmin = false;
+      function hideGlobalLoader() {
+        const loader = document.getElementById('global-loader');
+        loader.style.display = 'none';
+        if (loaderTimeout) {
+          clearTimeout(loaderTimeout);
+          loaderTimeout = null;
         }
-        currentUser = savedUser;
-        currentPin = savedPin;
+      }
+
+      // ---------- Инициализация темы ----------
+      document.getElementById('max-info').textContent = MAX_PER_DAY;
+
+      function getSystemTheme() {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+
+      function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        const btn = document.getElementById('theme-toggle');
+        if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+      }
+
+      function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme') || 'light';
+        const next = current === 'light' ? 'dark' : 'light';
+        applyTheme(next);
+      }
+
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme) {
+        applyTheme(savedTheme);
+      } else {
+        applyTheme(getSystemTheme());
+      }
+
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (!localStorage.getItem('theme')) {
+          applyTheme(e.matches ? 'dark' : 'light');
+        }
+      });
+
+      document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+      // ---------- Закрытие модальных окон ----------
+      function closeModal(modal) {
+        if (modal) modal.style.display = 'none';
+      }
+
+      document.querySelectorAll('.modal-close-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const modal = this.closest('.modal-overlay');
+          closeModal(modal);
+        });
+      });
+
+      document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', function (e) {
+          if (e.target === this) {
+            closeModal(this);
+          }
+        });
+      });
+
+      // ---------- API-вызовы ----------
+      async function verifyPinOnServer(name, pin) {
+        const url = API_URL + '?action=verifyPin&name=' + encodeURIComponent(name) + '&pin=' + encodeURIComponent(pin);
+        const resp = await fetch(url);
+        const data = await resp.json();
+        return data.success === true;
+      }
+
+      async function loadUsers() {
+        const resp = await fetch(API_URL + '?action=getUserNames');
+        const data = await resp.json();
+        if (data.error) {
+          console.error('Ошибка загрузки пользователей:', data.error);
+          return [];
+        }
+        return data.names || [];
+      }
+
+      async function loadUsersForAdmin(adminName, adminPin) {
+        const url = `${API_URL}?action=getUsers&adminName=${encodeURIComponent(adminName)}&adminPin=${encodeURIComponent(adminPin)}`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        return data.users || [];
+      }
+
+      // ---------- Авторизация ----------
+      function updateAuthUI() {
+        const loginBtn = document.getElementById('login-btn');
+        const userDisplay = document.getElementById('user-display');
+        const logoutBtn = document.getElementById('logout-btn');
+        const adminBtn = document.getElementById('admin-panel-btn');
+
+        if (currentUser) {
+          loginBtn.style.display = 'none';
+          userDisplay.textContent = '👤 ' + currentUser;
+          userDisplay.style.display = 'inline';
+          logoutBtn.style.display = 'inline';
+          adminBtn.style.display = isAdmin ? 'inline-block' : 'none';
+        } else {
+          loginBtn.style.display = 'inline';
+          userDisplay.style.display = 'none';
+          logoutBtn.style.display = 'none';
+          adminBtn.style.display = 'none';
+        }
+
+        const songsBtn = document.getElementById('manage-songs-btn');
+        if (currentUser && isAdmin) {
+          songsBtn.style.display = 'inline-block';
+        } else {
+          songsBtn.style.display = 'none';
+        }
+      }
+
+      function setUser(name, pin, admin) {
+        currentUser = name;
+        currentPin = pin;
+        isAdmin = admin;
+        localStorage.setItem('currentUser', name);
+        localStorage.setItem('currentUserPin', pin);
         updateAuthUI();
         updateRowStates('main-table-container');
-      } else {
+        renderRepertoire();
+      }
+
+      function logoutUser() {
+        currentUser = '';
+        currentPin = '';
+        isAdmin = false;
         localStorage.removeItem('currentUser');
         localStorage.removeItem('currentUserPin');
-      }
-    }
-
-    // ---------- Модальное окно входа ----------
-    async function showLoginModal() {
-      const modal = document.getElementById('login-modal');
-      const select = document.getElementById('login-user-select');
-      const pinInput = document.getElementById('login-pin-input');
-      const error = document.getElementById('login-error');
-      const confirmBtn = document.getElementById('login-confirm');
-      const cancelBtn = document.getElementById('login-cancel');
-
-      // Загружаем список имён (массив строк)
-      showGlobalLoader();
-      let namesList = [];
-      try {
-        namesList = await loadUsers();
-      } catch (e) {
-        console.error('Ошибка загрузки пользователей:', e);
-        alert('Не удалось загрузить список пользователей. Проверьте соединение.');
-        hideGlobalLoader();
-        return;
-      } finally {
-        hideGlobalLoader();
+        updateAuthUI();
+        updateRowStates('main-table-container');
       }
 
-      select.innerHTML = '<option value="">— Выберите —</option>';
-      namesList.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        select.appendChild(opt);
-      });
-
-      pinInput.value = '';
-      error.style.display = 'none';
-      modal.style.display = 'flex';
-      pinInput.focus();
-
-      const onConfirm = async () => {
-        const name = select.value;
-        const pin = pinInput.value.trim();
-        if (!name) {
-          error.textContent = 'Выберите пользователя';
-          error.style.display = 'block';
-          return;
-        }
-        if (!pin) {
-          error.textContent = 'Введите PIN-код';
-          error.style.display = 'block';
-          return;
-        }
-        // Меняем текст кнопки
-        const originalText = confirmBtn.textContent;
-        confirmBtn.textContent = '⏳ Проверка...';
-        confirmBtn.disabled = true;
-        showGlobalLoader();
-
-        try {
-          const valid = await verifyPinOnServer(name, pin);
-          if (valid) {
-            let admin = false;
-            try {
-              const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(name)}&adminPin=${encodeURIComponent(pin)}`);
-              const data = await resp.json();
-              if (!data.error) admin = true;
-            } catch (e) { /* не админ */ }
-            modal.style.display = 'none';
-            setUser(name, pin, admin);
-          } else {
-            error.textContent = 'Неверный PIN-код';
-            error.style.display = 'block';
-            pinInput.value = '';
-            pinInput.focus();
+      // Попытка автоматического входа при загрузке
+      async function autoLogin() {
+        const savedUser = localStorage.getItem('currentUser');
+        const savedPin = localStorage.getItem('currentUserPin');
+        if (!savedUser || !savedPin) return;
+        const valid = await verifyPinOnServer(savedUser, savedPin);
+        if (valid) {
+          // Проверяем, является ли пользователь администратором
+          try {
+            const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(savedUser)}&adminPin=${encodeURIComponent(savedPin)}`);
+            const data = await resp.json();
+            if (!data.error) {
+              // Пользователь админ
+              isAdmin = true;
+            } else {
+              isAdmin = false;
+            }
+          } catch (e) {
+            isAdmin = false;
           }
+          currentUser = savedUser;
+          currentPin = savedPin;
+          updateAuthUI();
+          updateRowStates('main-table-container');
+          renderRepertoire();
+        } else {
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('currentUserPin');
+        }
+      }
+
+      // ---------- Модальное окно входа ----------
+      async function showLoginModal() {
+        const modal = document.getElementById('login-modal');
+        const select = document.getElementById('login-user-select');
+        const pinInput = document.getElementById('login-pin-input');
+        const error = document.getElementById('login-error');
+        const confirmBtn = document.getElementById('login-confirm');
+        const cancelBtn = document.getElementById('login-cancel');
+
+        // Загружаем список имён (массив строк)
+        showGlobalLoader();
+        let namesList = [];
+        try {
+          namesList = await loadUsers();
         } catch (e) {
-          error.textContent = 'Ошибка проверки PIN';
-          error.style.display = 'block';
-          console.error(e);
+          console.error('Ошибка загрузки пользователей:', e);
+          alert('Не удалось загрузить список пользователей. Проверьте соединение.');
+          hideGlobalLoader();
+          return;
         } finally {
           hideGlobalLoader();
-          confirmBtn.textContent = originalText;
-          confirmBtn.disabled = false;
         }
-      };
 
-      const onCancel = () => {
-        modal.style.display = 'none';
-      };
+        select.innerHTML = '<option value="">— Выберите —</option>';
+        namesList.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
 
-      confirmBtn.onclick = onConfirm;
-      cancelBtn.onclick = onCancel;
-      pinInput.onkeydown = (e) => { if (e.key === 'Enter') onConfirm(); };
-      modal.addEventListener('click', function (e) {
-        if (e.target === this) onCancel();
-      });
-    }
+        pinInput.value = '';
+        error.style.display = 'none';
+        modal.style.display = 'flex';
+        pinInput.focus();
 
-    document.getElementById('login-btn').addEventListener('click', showLoginModal);
-    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+        const onConfirm = async () => {
+          const name = select.value;
+          const pin = pinInput.value.trim();
+          if (!name) {
+            error.textContent = 'Выберите пользователя';
+            error.style.display = 'block';
+            return;
+          }
+          if (!pin) {
+            error.textContent = 'Введите PIN-код';
+            error.style.display = 'block';
+            return;
+          }
+          // Меняем текст кнопки
+          const originalText = confirmBtn.textContent;
+          confirmBtn.textContent = '⏳ Проверка...';
+          confirmBtn.disabled = true;
+          showGlobalLoader();
 
-    // ---------- Управление пользователями (админ) ----------
-    document.getElementById('admin-panel-btn').addEventListener('click', async function () {
-      if (!isAdmin) return;
-      showGlobalLoader();
-      let userList = [];
-      try {
-        userList = await loadUsersForAdmin(currentUser, currentPin);
-      } catch (e) {
-        alert('Ошибка загрузки пользователей: ' + e.message);
-        hideGlobalLoader();
-        return;
-      } finally {
-        hideGlobalLoader();
+          try {
+            const valid = await verifyPinOnServer(name, pin);
+            if (valid) {
+              let admin = false;
+              try {
+                const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(name)}&adminPin=${encodeURIComponent(pin)}`);
+                const data = await resp.json();
+                if (!data.error) admin = true;
+              } catch (e) { /* не админ */ }
+              modal.style.display = 'none';
+              setUser(name, pin, admin);
+            } else {
+              error.textContent = 'Неверный PIN-код';
+              error.style.display = 'block';
+              pinInput.value = '';
+              pinInput.focus();
+            }
+          } catch (e) {
+            error.textContent = 'Ошибка проверки PIN';
+            error.style.display = 'block';
+            console.error(e);
+          } finally {
+            hideGlobalLoader();
+            confirmBtn.textContent = originalText;
+            confirmBtn.disabled = false;
+          }
+        };
+
+        const onCancel = () => {
+          modal.style.display = 'none';
+        };
+
+        confirmBtn.onclick = onConfirm;
+        cancelBtn.onclick = onCancel;
+        pinInput.onkeydown = (e) => { if (e.key === 'Enter') onConfirm(); };
+        modal.addEventListener('click', function (e) {
+          if (e.target === this) onCancel();
+        });
       }
 
-      const modal = document.getElementById('admin-modal');
-      const container = document.getElementById('admin-user-list');
-      const error = document.getElementById('admin-modal-error');
-      error.style.display = 'none';
-      let html = '<table style="width:100%; border-collapse:collapse;">';
-      html += '<tr><th style="text-align:left; padding:8px;">Имя</th><th style="text-align:left; padding:8px;">Новый PIN</th><th style="text-align:left; padding:8px;">Действие</th></tr>';
-      userList.forEach(u => {
-        html += `
+      document.getElementById('login-btn').addEventListener('click', showLoginModal);
+      document.getElementById('logout-btn').addEventListener('click', logoutUser);
+
+      // ---------- Управление пользователями (админ) ----------
+      document.getElementById('admin-panel-btn').addEventListener('click', async function () {
+        if (!isAdmin) return;
+        showGlobalLoader();
+        let userList = [];
+        try {
+          userList = await loadUsersForAdmin(currentUser, currentPin);
+        } catch (e) {
+          alert('Ошибка загрузки пользователей: ' + e.message);
+          hideGlobalLoader();
+          return;
+        } finally {
+          hideGlobalLoader();
+        }
+
+        const modal = document.getElementById('admin-modal');
+        const container = document.getElementById('admin-user-list');
+        const error = document.getElementById('admin-modal-error');
+        error.style.display = 'none';
+        let html = '<table style="width:100%; border-collapse:collapse;">';
+        html += '<tr><th style="text-align:left; padding:8px;">Имя</th><th style="text-align:left; padding:8px;">Новый PIN</th><th style="text-align:left; padding:8px;">Действие</th></tr>';
+        userList.forEach(u => {
+          html += `
       <tr>
         <td style="padding:8px;">${u.name}</td>
         <td style="padding:8px;"><input type="text" class="admin-pin-input" data-name="${u.name}" placeholder="Введите новый PIN" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></td>
         <td style="padding:8px;"><button class="admin-save-pin" data-name="${u.name}" style="padding:6px 14px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;">Сохранить</button></td>
       </tr>
     `;
-      });
-      html += '</table>';
-      container.innerHTML = html;
-      modal.style.display = 'flex';
+        });
+        html += '</table>';
+        container.innerHTML = html;
+        modal.style.display = 'flex';
 
-      container.querySelectorAll('.admin-save-pin').forEach(btn => {
-        btn.addEventListener('click', async function () {
-          const name = this.dataset.name;
-          const input = document.querySelector(`.admin-pin-input[data-name="${name}"]`);
-          const newPin = input.value.trim();
-          if (!newPin) {
-            error.textContent = 'PIN не может быть пустым';
-            error.style.display = 'block';
-            return;
-          }
-          error.style.display = 'none';
-          const originalText = this.textContent;
-          this.textContent = '⏳ Сохранение...';
-          this.disabled = true;
-          showGlobalLoader();
-          try {
-            const resp = await fetch(API_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: `action=setPin&name=${encodeURIComponent(name)}&newPin=${encodeURIComponent(newPin)}&adminName=${encodeURIComponent(currentUser)}&adminPin=${encodeURIComponent(currentPin)}`
-            });
-            const result = await resp.json();
-            if (result.error) {
-              error.textContent = result.error;
+        container.querySelectorAll('.admin-save-pin').forEach(btn => {
+          btn.addEventListener('click', async function () {
+            const name = this.dataset.name;
+            const input = document.querySelector(`.admin-pin-input[data-name="${name}"]`);
+            const newPin = input.value.trim();
+            if (!newPin) {
+              error.textContent = 'PIN не может быть пустым';
               error.style.display = 'block';
-            } else {
-              alert('PIN для ' + name + ' успешно обновлён!');
-              document.getElementById('admin-modal-close').click();
-              // Обновим список
-              document.getElementById('admin-panel-btn').click();
+              return;
             }
-          } catch (e) {
-            error.textContent = 'Ошибка сохранения: ' + e.message;
-            error.style.display = 'block';
-            console.error(e);
-          } finally {
-            hideGlobalLoader();
-            this.textContent = originalText;
-            this.disabled = false;
-          }
+            error.style.display = 'none';
+            const originalText = this.textContent;
+            this.textContent = '⏳ Сохранение...';
+            this.disabled = true;
+            showGlobalLoader();
+            try {
+              const resp = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=setPin&name=${encodeURIComponent(name)}&newPin=${encodeURIComponent(newPin)}&adminName=${encodeURIComponent(currentUser)}&adminPin=${encodeURIComponent(currentPin)}`
+              });
+              const result = await resp.json();
+              if (result.error) {
+                error.textContent = result.error;
+                error.style.display = 'block';
+              } else {
+                alert('PIN для ' + name + ' успешно обновлён!');
+                document.getElementById('admin-modal-close').click();
+                // Обновим список
+                document.getElementById('admin-panel-btn').click();
+              }
+            } catch (e) {
+              error.textContent = 'Ошибка сохранения: ' + e.message;
+              error.style.display = 'block';
+              console.error(e);
+            } finally {
+              hideGlobalLoader();
+              this.textContent = originalText;
+              this.disabled = false;
+            }
+          });
+        });
+
+        document.getElementById('admin-modal-close').onclick = function () {
+          modal.style.display = 'none';
+        };
+        modal.addEventListener('click', function (e) {
+          if (e.target === this) modal.style.display = 'none';
         });
       });
 
-      document.getElementById('admin-modal-close').onclick = function () {
-        modal.style.display = 'none';
-      };
-      modal.addEventListener('click', function (e) {
-        if (e.target === this) modal.style.display = 'none';
-      });
-    });
+      document.getElementById('manage-songs-btn').addEventListener('click', showSongsModal);
 
-    document.getElementById('manage-songs-btn').addEventListener('click', showSongsModal);
-
-    // ---------- Вкладки ----------
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', function () {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        const tabName = this.dataset.tab;
-        document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
-        document.getElementById('tab-' + tabName).style.display = 'block';
-      });
-    });
-
-    // ---------- Парсер даты ----------
-    function parseDateDDMMYYYY(str) {
-      if (!str) return null;
-      const parts = str.split('.');
-      if (parts.length !== 3) return null;
-      const d = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const y = parseInt(parts[2], 10);
-      if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
-      return new Date(y, m, d);
-    }
-
-    function formatDateDisplay(dateStr) {
-      return dateStr;
-    }
-
-    // ---------- Управление песнями ----------
-    async function loadSongs(adminName, adminPin) {
-      const url = `${API_URL}?action=getSongs&adminName=${encodeURIComponent(adminName)}&adminPin=${encodeURIComponent(adminPin)}`;
-      const resp = await fetch(url);
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      return data.songs || [];
-    }
-
-    async function addNewSong(name, text, changer, pin) {
-      const body = `action=addSong&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&text=${encodeURIComponent(text)}`;
-      const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      return true;
-    }
-
-    async function updateSongTextOnServer(name, newText, changer, pin) {
-      const body = `action=updateSongText&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&newText=${encodeURIComponent(newText)}`;
-      const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      return true;
-    }
-
-    async function deleteSongOnServer(name, changer, pin) {
-      const body = `action=deleteSong&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}`;
-      const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      return true;
-    }
-
-    async function setRepertoireSongs(date, songNames, changer, pin) {
-      const body = `action=setRepertoireSongs&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&date=${encodeURIComponent(date)}&songs=${encodeURIComponent(songNames.join('\n'))}`;
-      const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      return true;
-    }
-
-    // ---------- Модальное окно управления песнями ----------
-    let currentRepertoireDate = '';
-
-    async function showSongsModal() {
-      if (!isAdmin) return;
-      const modal = document.getElementById('songs-modal');
-      const container = document.getElementById('songs-list-container');
-      const error = document.getElementById('add-song-error');
-      error.style.display = 'none';
-
-      showGlobalLoader();
-      let songs = [];
-      try {
-        songs = await loadSongs(currentUser, currentPin);
-      } catch (e) {
-        alert('Ошибка загрузки песен: ' + e.message);
-        hideGlobalLoader();
-        return;
-      } finally {
-        hideGlobalLoader();
-      }
-      allSongs = songs;
-
-      container.innerHTML = '';
-      if (songs.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-muted);">Нет песен. Добавьте первую!</p>';
-      } else {
-        songs.forEach(song => {
-          const div = document.createElement('div');
-          div.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:8px;';
-          const nameSpan = document.createElement('span');
-          nameSpan.textContent = song.name;
-          nameSpan.style.cssText = 'flex:0 0 150px; font-weight:500;';
-          const textArea = document.createElement('textarea');
-          textArea.value = song.text;
-          textArea.style.cssText = 'flex:1; padding:4px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); min-height:40px;';
-          textArea.dataset.name = song.name;
-          const saveBtn = document.createElement('button');
-          saveBtn.textContent = 'Сохранить';
-          saveBtn.style.cssText = 'padding:4px 12px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;';
-          saveBtn.addEventListener('click', async () => {
-            const newText = textArea.value;
-            try {
-              showGlobalLoader();
-              await updateSongTextOnServer(song.name, newText, currentUser, currentPin);
-              alert('Текст обновлён');
-              await showSongsModal();
-            } catch (e) {
-              alert('Ошибка: ' + e.message);
-            } finally {
-              hideGlobalLoader();
-            }
-          });
-          const deleteBtn = document.createElement('button');
-          deleteBtn.textContent = '🗑️';
-          deleteBtn.style.cssText = 'padding:4px 8px; border:none; border-radius:4px; background:#ef4444; color:#fff; cursor:pointer;';
-          deleteBtn.addEventListener('click', async () => {
-            if (!confirm('Удалить песню "' + song.name + '"?')) return;
-            try {
-              showGlobalLoader();
-              await deleteSongOnServer(song.name, currentUser, currentPin);
-              alert('Песня удалена');
-              await showSongsModal();
-            } catch (e) {
-              alert('Ошибка: ' + e.message);
-            } finally {
-              hideGlobalLoader();
-            }
-          });
-          div.appendChild(nameSpan);
-          div.appendChild(textArea);
-          div.appendChild(saveBtn);
-          div.appendChild(deleteBtn);
-          container.appendChild(div);
+      // ---------- Вкладки ----------
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          const tabName = this.dataset.tab;
+          document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+          document.getElementById('tab-' + tabName).style.display = 'block';
         });
+      });
+
+      // ---------- Парсер даты ----------
+      function parseDateDDMMYYYY(str) {
+        if (!str) return null;
+        const parts = str.split('.');
+        if (parts.length !== 3) return null;
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parseInt(parts[2], 10);
+        if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+        return new Date(y, m, d);
       }
 
-      modal.style.display = 'flex';
+      function formatDateDisplay(dateStr) {
+        return dateStr;
+      }
 
-      document.getElementById('add-song-btn').onclick = async () => {
-        const nameInput = document.getElementById('new-song-name');
-        const textInput = document.getElementById('new-song-text');
-        const name = nameInput.value.trim();
-        const text = textInput.value.trim();
-        if (!name) {
-          document.getElementById('add-song-error').textContent = 'Введите название';
-          document.getElementById('add-song-error').style.display = 'block';
-          return;
-        }
-        document.getElementById('add-song-error').style.display = 'none';
+      // ---------- Управление песнями ----------
+      async function loadSongs(adminName, adminPin) {
+        const url = `${API_URL}?action=getSongs&adminName=${encodeURIComponent(adminName)}&adminPin=${encodeURIComponent(adminPin)}`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        return data.songs || [];
+      }
+
+      async function addNewSong(name, text, changer, pin) {
+        const body = `action=addSong&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&text=${encodeURIComponent(text)}`;
+        const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        return true;
+      }
+
+      async function updateSongTextOnServer(name, newText, changer, pin) {
+        const body = `action=updateSongText&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&newText=${encodeURIComponent(newText)}`;
+        const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        return true;
+      }
+
+      async function deleteSongOnServer(name, changer, pin) {
+        const body = `action=deleteSong&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}`;
+        const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        return true;
+      }
+
+      async function setRepertoireSongs(date, songNames, changer, pin) {
+        const body = `action=setRepertoireSongs&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&date=${encodeURIComponent(date)}&songs=${encodeURIComponent(songNames.join('\n'))}`;
+        const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        return true;
+      }
+
+      // ---------- Модальное окно управления песнями ----------
+      let currentRepertoireDate = '';
+
+      async function showSongsModal() {
+        if (!isAdmin) return;
+        const modal = document.getElementById('songs-modal');
+        const container = document.getElementById('songs-list-container');
+        const error = document.getElementById('add-song-error');
+        error.style.display = 'none';
+
+        showGlobalLoader();
+        let songs = [];
         try {
-          showGlobalLoader();
-          await addNewSong(name, text, currentUser, currentPin);
-          alert('Песня добавлена');
-          nameInput.value = '';
-          textInput.value = '';
-          await showSongsModal();
+          songs = await loadSongs(currentUser, currentPin);
         } catch (e) {
-          document.getElementById('add-song-error').textContent = e.message;
-          document.getElementById('add-song-error').style.display = 'block';
+          alert('Ошибка загрузки песен: ' + e.message);
+          hideGlobalLoader();
+          return;
         } finally {
           hideGlobalLoader();
         }
-      };
+        allSongs = songs;
 
-      document.getElementById('songs-modal-close').onclick = () => modal.style.display = 'none';
-      modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
-    }
+        filteredSongs = allSongs;
+        songsCurrentPage = 0;
+        renderSongsList();
 
-    // ---------- Модалка добавления песни в репертуар ----------
-    function openAddRepertoireSongModal(date) {
-      currentRepertoireDate = date;
-      const modal = document.getElementById('add-repertoire-song-modal');
-      const select = document.getElementById('repertoire-song-select');
-      const error = document.getElementById('add-repertoire-song-error');
-      error.style.display = 'none';
-      // Загружаем список всех песен (из allSongs)
-      if (!allSongs.length) {
-        loadSongs(currentUser, currentPin).then(songs => {
-          allSongs = songs;
-          fillRepertoireSongSelect(select);
-        }).catch(e => alert('Ошибка загрузки песен: ' + e.message));
-      } else {
-        fillRepertoireSongSelect(select);
-      }
-      modal.style.display = 'flex';
-    }
+        filteredSongs = allSongs;
+        songsCurrentPage = 0;
+        renderSongsList();
 
-    function fillRepertoireSongSelect(select) {
-      select.innerHTML = '<option value="">— Выберите —</option>';
-      allSongs.forEach(song => {
-        const opt = document.createElement('option');
-        opt.value = song.name;
-        opt.textContent = song.name;
-        select.appendChild(opt);
-      });
-    }
+        modal.style.display = 'flex';
 
-    document.getElementById('add-repertoire-song-confirm').addEventListener('click', async () => {
-      const select = document.getElementById('repertoire-song-select');
-      const songName = select.value;
-      if (!songName) {
-        document.getElementById('add-repertoire-song-error').textContent = 'Выберите песню';
-        document.getElementById('add-repertoire-song-error').style.display = 'block';
-        return;
-      }
-      try {
-        showGlobalLoader();
-        const entry = repertoireData[currentRepertoireDate];
-        const currentSongs = entry ? entry.songs || [] : [];
-        const newSongs = [...currentSongs, { name: songName, text: '' }];
-        await setRepertoireSongs(currentRepertoireDate, newSongs.map(s => s.name), currentUser, currentPin);
-        await refreshRepertoire();
-        document.getElementById('add-repertoire-song-modal').style.display = 'none';
-        alert('Песня добавлена');
-      } catch (e) {
-        alert('Ошибка: ' + e.message);
-      } finally {
-        hideGlobalLoader();
-      }
-    });
-
-    document.getElementById('add-repertoire-song-cancel').addEventListener('click', () => {
-      document.getElementById('add-repertoire-song-modal').style.display = 'none';
-    });
-
-    // ---------- Обновление репертуара ----------
-    async function refreshRepertoire() {
-      const resp = await fetch(API_URL);
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      repertoireData = data.repertoire || {};
-      renderRepertoire();
-    }
-
-    // ---------- Загрузка данных ----------
-    async function loadData() {
-      const loading = document.getElementById('loading');
-      const mainSection = document.getElementById('main-section');
-      const archiveSection = document.getElementById('archive-section');
-      const statsSection = document.getElementById('stats-section');
-
-      showGlobalLoader();
-      try {
-        const resp = await fetch(API_URL);
-        if (!resp.ok) throw new Error('Ошибка загрузки');
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error);
-
-        const { dates, names, matrix, repertoire } = data;
-        if (!dates || !names || !matrix) throw new Error('Некорректные данные');
-
-        allDates = dates.map((dateStr, i) => ({
-          dateStr: dateStr,
-          names: names,
-          matrixRow: matrix[i] || []
-        }));
-        repertoireData = repertoire || {};
-
-        // Автоматический вход
-        await autoLogin();
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        futureDates = [];
-        pastDates = [];
-
-        allDates.forEach(item => {
-          const d = parseDateDDMMYYYY(item.dateStr);
-          if (!d) {
-            futureDates.push(item);
+        document.getElementById('add-song-btn').onclick = async () => {
+          const nameInput = document.getElementById('new-song-name');
+          const textInput = document.getElementById('new-song-text');
+          const name = nameInput.value.trim();
+          const text = textInput.value.trim();
+          if (!name) {
+            document.getElementById('add-song-error').textContent = 'Введите название';
+            document.getElementById('add-song-error').style.display = 'block';
             return;
           }
-          d.setHours(0, 0, 0, 0);
-          if (d < today) pastDates.push(item);
-          else futureDates.push(item);
+          document.getElementById('add-song-error').style.display = 'none';
+          try {
+            showGlobalLoader();
+            await addNewSong(name, text, currentUser, currentPin);
+            alert('Песня добавлена');
+            nameInput.value = '';
+            textInput.value = '';
+            await showSongsModal();
+          } catch (e) {
+            document.getElementById('add-song-error').textContent = e.message;
+            document.getElementById('add-song-error').style.display = 'block';
+          } finally {
+            hideGlobalLoader();
+          }
+        };
+
+        document.getElementById('songs-modal-close').onclick = () => modal.style.display = 'none';
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+      }
+
+      function renderSongsList() {
+        const container = document.getElementById('songs-list-container');
+        const paginationEl = document.getElementById('songs-pagination');
+        const filter = document.getElementById('songs-filter-input').value.toLowerCase().trim();
+        filteredSongs = allSongs.filter(s => s.name.toLowerCase().includes(filter));
+        const totalPages = Math.ceil(filteredSongs.length / SONGS_PAGE_SIZE) || 1;
+        if (songsCurrentPage >= totalPages) songsCurrentPage = totalPages - 1;
+        if (songsCurrentPage < 0) songsCurrentPage = 0;
+        const start = songsCurrentPage * SONGS_PAGE_SIZE;
+        const end = Math.min(start + SONGS_PAGE_SIZE, filteredSongs.length);
+        const pageItems = filteredSongs.slice(start, end);
+
+        container.innerHTML = '';
+        if (pageItems.length === 0) {
+          container.innerHTML = '<p style="color:var(--text-muted);">Нет песен, удовлетворяющих фильтру.</p>';
+        } else {
+          pageItems.forEach(song => {
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:8px;';
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = song.name;
+            nameSpan.style.cssText = 'flex:0 0 150px; font-weight:500;';
+            const textArea = document.createElement('textarea');
+            textArea.value = song.text;
+            textArea.style.cssText = 'flex:1; padding:4px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); min-height:40px;';
+            textArea.dataset.name = song.name;
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Сохранить';
+            saveBtn.style.cssText = 'padding:4px 12px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;';
+            saveBtn.addEventListener('click', async () => {
+              const newText = textArea.value;
+              try {
+                showGlobalLoader();
+                await updateSongTextOnServer(song.name, newText, currentUser, currentPin);
+                await showSongsModal();
+              } catch (e) {
+                alert('Ошибка: ' + e.message);
+              } finally {
+                hideGlobalLoader();
+              }
+            });
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.style.cssText = 'padding:4px 8px; border:none; border-radius:4px; background:#ef4444; color:#fff; cursor:pointer;';
+            deleteBtn.addEventListener('click', async () => {
+              if (!confirm('Удалить песню "' + song.name + '"?')) return;
+              try {
+                showGlobalLoader();
+                await deleteSongOnServer(song.name, currentUser, currentPin);
+                await showSongsModal();
+              } catch (e) {
+                alert('Ошибка: ' + e.message);
+              } finally {
+                hideGlobalLoader();
+              }
+            });
+            div.appendChild(nameSpan);
+            div.appendChild(textArea);
+            div.appendChild(saveBtn);
+            div.appendChild(deleteBtn);
+            container.appendChild(div);
+          });
+        }
+
+        // Пагинация
+        paginationEl.innerHTML = `
+          <button class="prev" ${songsCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
+          <span>${songsCurrentPage + 1} / ${totalPages}</span>
+          <button class="next" ${songsCurrentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
+        `;
+        paginationEl.querySelector('.prev').addEventListener('click', () => {
+          if (songsCurrentPage > 0) { songsCurrentPage--; renderSongsList(); }
         });
+        paginationEl.querySelector('.next').addEventListener('click', () => {
+          if (songsCurrentPage < totalPages - 1) { songsCurrentPage++; renderSongsList(); }
+        });
+      }
 
-        futureDates.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
-        pastDates.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
+      // Обработчик фильтра
+      document.getElementById('songs-filter-input').addEventListener('input', function () {
+        songsCurrentPage = 0;
+        renderSongsList();
+      });
 
-        loading.style.display = 'none';
-        mainSection.style.display = 'block';
-        archiveSection.style.display = 'block';
-        statsSection.style.display = 'block';
+      // ---------- Модалка добавления песни в репертуар ----------
+      function openAddRepertoireSongModal(date) {
+        currentRepertoireDate = date;
+        const modal = document.getElementById('add-repertoire-song-modal');
+        const select = document.getElementById('repertoire-song-select');
+        const error = document.getElementById('add-repertoire-song-error');
+        error.style.display = 'none';
+        // Загружаем список всех песен (из allSongs)
+        if (!allSongs.length) {
+          loadSongs(currentUser, currentPin).then(songs => {
+            allSongs = songs;
+            fillRepertoireSongSelect(select);
+          }).catch(e => alert('Ошибка загрузки песен: ' + e.message));
+        } else {
+          fillRepertoireSongSelect(select);
+        }
+        modal.style.display = 'flex';
+      }
 
-        renderMainTable();
-        renderArchiveTable();
-        renderStats();
+      function fillRepertoireSongSelect(select) {
+        select.innerHTML = '<option value="">— Выберите —</option>';
+        allSongs.forEach(song => {
+          const opt = document.createElement('option');
+          opt.value = song.name;
+          opt.textContent = song.name;
+          select.appendChild(opt);
+        });
+      }
+
+      document.getElementById('add-repertoire-song-confirm').addEventListener('click', async () => {
+        const select = document.getElementById('repertoire-song-select');
+        const songName = select.value;
+        if (!songName) {
+          document.getElementById('add-repertoire-song-error').textContent = 'Выберите песню';
+          document.getElementById('add-repertoire-song-error').style.display = 'block';
+          return;
+        }
+        try {
+          showGlobalLoader();
+          const entry = repertoireData[currentRepertoireDate];
+          const currentSongs = entry ? entry.songs || [] : [];
+          const newSongs = [...currentSongs, { name: songName, text: '' }];
+          await setRepertoireSongs(currentRepertoireDate, newSongs.map(s => s.name), currentUser, currentPin);
+          await refreshRepertoire();
+          document.getElementById('add-repertoire-song-modal').style.display = 'none';
+        } catch (e) {
+          alert('Ошибка: ' + e.message);
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
+      document.getElementById('add-repertoire-song-cancel').addEventListener('click', () => {
+        document.getElementById('add-repertoire-song-modal').style.display = 'none';
+      });
+
+      // ---------- Обновление репертуара ----------
+      async function refreshRepertoire() {
+        const resp = await fetch(API_URL);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        repertoireData = data.repertoire || {};
         renderRepertoire();
-        updateCounts();
-
-      } catch (e) {
-        loading.innerHTML = `<div style="color:#ef4444; padding:20px;">❌ ${e.message}</div>`;
-        console.error(e);
-      } finally {
-        hideGlobalLoader();
-      }
-    }
-
-    // ---------- Рендер основной таблицы ----------
-    function renderMainTable() {
-      const container = document.getElementById('main-table-container');
-      const paginationEl = document.getElementById('main-pagination');
-
-      if (futureDates.length === 0) {
-        container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Нет предстоящих дежурств.</p>';
-        paginationEl.innerHTML = '';
-        return;
       }
 
-      const totalPages = Math.ceil(futureDates.length / PAGE_SIZE);
-      if (currentPage >= totalPages) currentPage = totalPages - 1;
-      if (currentPage < 0) currentPage = 0;
+      // ---------- Загрузка данных ----------
+      async function loadData() {
+        const loading = document.getElementById('loading');
+        const mainSection = document.getElementById('main-section');
+        const archiveSection = document.getElementById('archive-section');
+        const statsSection = document.getElementById('stats-section');
 
-      const start = currentPage * PAGE_SIZE;
-      const end = Math.min(start + PAGE_SIZE, futureDates.length);
-      const pageItems = futureDates.slice(start, end);
+        showGlobalLoader();
+        try {
+          const resp = await fetch(API_URL);
+          if (!resp.ok) throw new Error('Ошибка загрузки');
+          const data = await resp.json();
+          if (data.error) throw new Error(data.error);
 
-      container.innerHTML = buildTableHTML(pageItems, false);
-      attachMainEvents();
+          const { dates, names, matrix, repertoire } = data;
+          if (!dates || !names || !matrix) throw new Error('Некорректные данные');
 
-      paginationEl.innerHTML = `
+          allDates = dates.map((dateStr, i) => ({
+            dateStr: dateStr,
+            names: names,
+            matrixRow: matrix[i] || []
+          }));
+          repertoireData = repertoire || {};
+
+          // Автоматический вход
+          await autoLogin();
+
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          futureDates = [];
+          pastDates = [];
+
+          allDates.forEach(item => {
+            const d = parseDateDDMMYYYY(item.dateStr);
+            if (!d) {
+              futureDates.push(item);
+              return;
+            }
+            d.setHours(0, 0, 0, 0);
+            if (d < today) pastDates.push(item);
+            else futureDates.push(item);
+          });
+
+          futureDates.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
+          pastDates.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
+
+          loading.style.display = 'none';
+          mainSection.style.display = 'block';
+          archiveSection.style.display = 'block';
+          statsSection.style.display = 'block';
+
+          renderMainTable();
+          renderArchiveTable();
+          renderStats();
+          renderRepertoire();
+          updateCounts();
+
+        } catch (e) {
+          loading.innerHTML = `<div style="color:#ef4444; padding:20px;">❌ ${e.message}</div>`;
+          console.error(e);
+        } finally {
+          hideGlobalLoader();
+        }
+      }
+
+      // ---------- Рендер основной таблицы ----------
+      function renderMainTable() {
+        const container = document.getElementById('main-table-container');
+        const paginationEl = document.getElementById('main-pagination');
+
+        if (futureDates.length === 0) {
+          container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Нет предстоящих дежурств.</p>';
+          paginationEl.innerHTML = '';
+          return;
+        }
+
+        const totalPages = Math.ceil(futureDates.length / PAGE_SIZE);
+        if (currentPage >= totalPages) currentPage = totalPages - 1;
+        if (currentPage < 0) currentPage = 0;
+
+        const start = currentPage * PAGE_SIZE;
+        const end = Math.min(start + PAGE_SIZE, futureDates.length);
+        const pageItems = futureDates.slice(start, end);
+
+        container.innerHTML = buildTableHTML(pageItems, false);
+        attachMainEvents();
+
+        paginationEl.innerHTML = `
       <button class="prev" ${currentPage === 0 ? 'disabled' : ''}>← Назад</button>
       <span>${currentPage + 1} / ${totalPages}</span>
       <button class="next" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
     `;
-      paginationEl.querySelector('.prev').addEventListener('click', () => {
-        if (currentPage > 0) { currentPage--; renderMainTable(); }
-      });
-      paginationEl.querySelector('.next').addEventListener('click', () => {
-        if (currentPage < totalPages - 1) { currentPage++; renderMainTable(); }
-      });
-    }
-
-    // ---------- Рендер архива ----------
-    function renderArchiveTable() {
-      const container = document.getElementById('archive-table-container');
-      if (pastDates.length === 0) {
-        container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Архив пуст.</p>';
-        return;
+        paginationEl.querySelector('.prev').addEventListener('click', () => {
+          if (currentPage > 0) { currentPage--; renderMainTable(); }
+        });
+        paginationEl.querySelector('.next').addEventListener('click', () => {
+          if (currentPage < totalPages - 1) { currentPage++; renderMainTable(); }
+        });
       }
-      container.innerHTML = buildTableHTML(pastDates, true);
-    }
 
-    // ---------- Построение HTML таблицы ----------
-    function buildTableHTML(items, isArchive) {
-      if (!items || items.length === 0) return '';
-      const names = items[0].names;
-      let html = `
+      // ---------- Рендер архива ----------
+      function renderArchiveTable() {
+        const container = document.getElementById('archive-table-container');
+        if (pastDates.length === 0) {
+          container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Архив пуст.</p>';
+          return;
+        }
+        container.innerHTML = buildTableHTML(pastDates, true);
+      }
+
+      // ---------- Построение HTML таблицы ----------
+      function buildTableHTML(items, isArchive) {
+        if (!items || items.length === 0) return '';
+        const names = items[0].names;
+        let html = `
     <div class="table-wrapper">
       <table>
         <thead>
@@ -938,15 +989,15 @@
         <tbody>
   `;
 
-      items.forEach(item => {
-        const dateStr = item.dateStr;
-        const row = item.matrixRow;
-        const checkedCount = row.filter(v => v === true).length;
-        const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
-        const fillClass = checkedCount === MAX_PER_DAY ? 'full' : '';
+        items.forEach(item => {
+          const dateStr = item.dateStr;
+          const row = item.matrixRow;
+          const checkedCount = row.filter(v => v === true).length;
+          const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
+          const fillClass = checkedCount === MAX_PER_DAY ? 'full' : '';
 
-        html += `<tr data-date="${dateStr}">`;
-        html += `
+          html += `<tr data-date="${dateStr}">`;
+          html += `
       <td>
         <div class="date-cell">
           <span class="date-text">${formatDateDisplay(dateStr)}</span>
@@ -959,17 +1010,17 @@
         </div>
       </td>
     `;
-        for (let j = 0; j < names.length; j++) {
-          const checked = row[j] === true;
-          const name = names[j];
-          let cellClass = 'cell';
-          if (isArchive) {
-            cellClass += ' archive-cell';
-          } else {
-            cellClass += checked ? ' selected' : '';
-          }
-          const display = checked ? '✔' : '•';
-          html += `
+          for (let j = 0; j < names.length; j++) {
+            const checked = row[j] === true;
+            const name = names[j];
+            let cellClass = 'cell';
+            if (isArchive) {
+              cellClass += ' archive-cell';
+            } else {
+              cellClass += checked ? ' selected' : '';
+            }
+            const display = checked ? '✔' : '•';
+            html += `
         <td>
           <span class="${cellClass}" 
                 ${!isArchive ? `data-date="${dateStr}" data-name="${name}" data-checked="${checked}"` : ''}>
@@ -977,158 +1028,158 @@
           </span>
         </td>
       `;
-        }
-        html += '</tr>';
-      });
-
-      html += `</tbody></table></div>`;
-      return html;
-    }
-
-    // ---------- Счётчики ----------
-    function updateCounts() {
-      document.getElementById('main-count').textContent = `(${futureDates.length})`;
-      document.getElementById('archive-count').textContent = `(${pastDates.length})`;
-    }
-
-    // ---------- Обработчики для основной таблицы ----------
-    function attachMainEvents() {
-      updateRowStates('main-table-container');
-      const container = document.getElementById('main-table-container');
-      container.querySelectorAll('.cell:not(.archive-cell)').forEach(cell => {
-        cell.removeEventListener('click', toggleCell);
-        cell.addEventListener('click', toggleCell);
-      });
-    }
-
-    // ---------- Обновление состояний строк (с учётом авторизации) ----------
-    function updateRowStates(containerId) {
-      const container = document.getElementById(containerId);
-      if (!container) return;
-      const rows = container.querySelectorAll('tbody tr');
-      rows.forEach(tr => {
-        const cells = tr.querySelectorAll('.cell:not(.archive-cell)');
-        let checkedCount = 0;
-        cells.forEach(cell => {
-          if (cell.dataset.checked === 'true') checkedCount++;
+          }
+          html += '</tr>';
         });
 
-        const progressFill = tr.querySelector('.progress-fill');
-        const countSpan = tr.querySelector('.progress-wrapper span');
-        if (progressFill) {
-          const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
-          progressFill.style.width = percent + '%';
-          if (checkedCount === MAX_PER_DAY) progressFill.classList.add('full');
-          else progressFill.classList.remove('full');
+        html += `</tbody></table></div>`;
+        return html;
+      }
+
+      // ---------- Счётчики ----------
+      function updateCounts() {
+        document.getElementById('main-count').textContent = `(${futureDates.length})`;
+        document.getElementById('archive-count').textContent = `(${pastDates.length})`;
+      }
+
+      // ---------- Обработчики для основной таблицы ----------
+      function attachMainEvents() {
+        updateRowStates('main-table-container');
+        const container = document.getElementById('main-table-container');
+        container.querySelectorAll('.cell:not(.archive-cell)').forEach(cell => {
+          cell.removeEventListener('click', toggleCell);
+          cell.addEventListener('click', toggleCell);
+        });
+      }
+
+      // ---------- Обновление состояний строк (с учётом авторизации) ----------
+      function updateRowStates(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const rows = container.querySelectorAll('tbody tr');
+        rows.forEach(tr => {
+          const cells = tr.querySelectorAll('.cell:not(.archive-cell)');
+          let checkedCount = 0;
+          cells.forEach(cell => {
+            if (cell.dataset.checked === 'true') checkedCount++;
+          });
+
+          const progressFill = tr.querySelector('.progress-fill');
+          const countSpan = tr.querySelector('.progress-wrapper span');
+          if (progressFill) {
+            const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
+            progressFill.style.width = percent + '%';
+            if (checkedCount === MAX_PER_DAY) progressFill.classList.add('full');
+            else progressFill.classList.remove('full');
+          }
+          if (countSpan) countSpan.textContent = `${checkedCount}/${MAX_PER_DAY}`;
+
+          if (checkedCount === MAX_PER_DAY) tr.classList.add('row-full');
+          else tr.classList.remove('row-full');
+
+          const isAuthorized = currentUser && currentUser !== '';
+          cells.forEach(cell => {
+            const cellName = cell.dataset.name;
+            const isOwn = isAuthorized && (cellName === currentUser);
+            if (cell.dataset.checked !== 'true') {
+              if (checkedCount >= MAX_PER_DAY || (!isOwn && !isAdmin)) {
+                cell.classList.add('disabled');
+              } else {
+                cell.classList.remove('disabled');
+              }
+            } else {
+              if (!isOwn && !isAdmin) {
+                cell.classList.add('disabled');
+              } else {
+                cell.classList.remove('disabled');
+              }
+            }
+          });
+        });
+      }
+
+      // ---------- Обработчик клика по ячейке ----------
+      async function toggleCell(event) {
+        const cell = event.currentTarget;
+        if (cell.classList.contains('disabled') || cell.classList.contains('archive-cell')) return;
+
+        const date = cell.dataset.date;
+        const name = cell.dataset.name;
+        if (!currentUser) {
+          alert('Пожалуйста, войдите в систему.');
+          return;
         }
-        if (countSpan) countSpan.textContent = `${checkedCount}/${MAX_PER_DAY}`;
+        if (!isAdmin && currentUser !== name) {
+          alert('Вы можете изменять только свои ячейки.');
+          return;
+        }
 
-        if (checkedCount === MAX_PER_DAY) tr.classList.add('row-full');
-        else tr.classList.remove('row-full');
+        const currentChecked = cell.dataset.checked === 'true';
+        const newValue = !currentChecked;
+        let confirmMessage = currentChecked
+          ? `Вы уверены, что хотите снять ${name} с ${date}?`
+          : `Вы уверены, что хотите назначить ${name} на ${date}?`;
+        if (!confirm(confirmMessage)) return;
 
-        const isAuthorized = currentUser && currentUser !== '';
-        cells.forEach(cell => {
-          const cellName = cell.dataset.name;
-          const isOwn = isAuthorized && (cellName === currentUser);
-          if (cell.dataset.checked !== 'true') {
-            if (checkedCount >= MAX_PER_DAY || (!isOwn && !isAdmin)) {
-              cell.classList.add('disabled');
-            } else {
-              cell.classList.remove('disabled');
-            }
-          } else {
-            if (!isOwn && !isAdmin) {
-              cell.classList.add('disabled');
-            } else {
-              cell.classList.remove('disabled');
-            }
+        // Оптимистичное обновление UI
+        cell.dataset.checked = String(newValue);
+        cell.textContent = newValue ? '✔' : '•';
+        newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
+        updateRowStates('main-table-container');
+
+        showGlobalLoader(); // Показываем спиннер
+        try {
+          const params = new URLSearchParams();
+          params.append('date', date);
+          params.append('name', name);
+          params.append('value', String(newValue));
+          params.append('changer', currentUser);
+          params.append('pin', currentPin);
+          params.append('isAdmin', String(isAdmin));
+          await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+          });
+        } catch (e) {
+          alert('Ошибка сохранения. Попробуйте ещё раз.');
+          // Откат
+          cell.dataset.checked = String(currentChecked);
+          cell.textContent = currentChecked ? '✔' : '•';
+          currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
+          updateRowStates('main-table-container');
+          console.error(e);
+        } finally {
+          hideGlobalLoader();
+        }
+      }
+
+      // ---------- Статистика ----------
+      function renderStats() {
+        const section = document.getElementById('stats-section');
+        const container = document.getElementById('stats-container');
+        const canvas = document.getElementById('chartCanvas');
+
+        if (!allDates.length || !pastDates.length) {
+          section.style.display = 'none';
+          return;
+        }
+
+        const names = pastDates[0].names;
+        const totals = {};
+        names.forEach(name => totals[name] = 0);
+
+        pastDates.forEach(item => {
+          const row = item.matrixRow;
+          for (let i = 0; i < names.length; i++) {
+            if (row[i] === true) totals[names[i]]++;
           }
         });
-      });
-    }
 
-    // ---------- Обработчик клика по ячейке ----------
-    async function toggleCell(event) {
-      const cell = event.currentTarget;
-      if (cell.classList.contains('disabled') || cell.classList.contains('archive-cell')) return;
+        const maxVal = Math.max(...Object.values(totals));
+        const maxName = Object.keys(totals).find(k => totals[k] === maxVal);
 
-      const date = cell.dataset.date;
-      const name = cell.dataset.name;
-      if (!currentUser) {
-        alert('Пожалуйста, войдите в систему.');
-        return;
-      }
-      if (!isAdmin && currentUser !== name) {
-        alert('Вы можете изменять только свои ячейки.');
-        return;
-      }
-
-      const currentChecked = cell.dataset.checked === 'true';
-      const newValue = !currentChecked;
-      let confirmMessage = currentChecked
-        ? `Вы уверены, что хотите снять ${name} с ${date}?`
-        : `Вы уверены, что хотите назначить ${name} на ${date}?`;
-      if (!confirm(confirmMessage)) return;
-
-      // Оптимистичное обновление UI
-      cell.dataset.checked = String(newValue);
-      cell.textContent = newValue ? '✔' : '•';
-      newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
-      updateRowStates('main-table-container');
-
-      showGlobalLoader(); // Показываем спиннер
-      try {
-        const params = new URLSearchParams();
-        params.append('date', date);
-        params.append('name', name);
-        params.append('value', String(newValue));
-        params.append('changer', currentUser);
-        params.append('pin', currentPin);
-        params.append('isAdmin', String(isAdmin));
-        await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params.toString()
-        });
-      } catch (e) {
-        alert('Ошибка сохранения. Попробуйте ещё раз.');
-        // Откат
-        cell.dataset.checked = String(currentChecked);
-        cell.textContent = currentChecked ? '✔' : '•';
-        currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
-        updateRowStates('main-table-container');
-        console.error(e);
-      } finally {
-        hideGlobalLoader();
-      }
-    }
-
-    // ---------- Статистика ----------
-    function renderStats() {
-      const section = document.getElementById('stats-section');
-      const container = document.getElementById('stats-container');
-      const canvas = document.getElementById('chartCanvas');
-
-      if (!allDates.length || !pastDates.length) {
-        section.style.display = 'none';
-        return;
-      }
-
-      const names = pastDates[0].names;
-      const totals = {};
-      names.forEach(name => totals[name] = 0);
-
-      pastDates.forEach(item => {
-        const row = item.matrixRow;
-        for (let i = 0; i < names.length; i++) {
-          if (row[i] === true) totals[names[i]]++;
-        }
-      });
-
-      const maxVal = Math.max(...Object.values(totals));
-      const maxName = Object.keys(totals).find(k => totals[k] === maxVal);
-
-      let html = `
+        let html = `
       <div class="stats-card stats-total">
         <div class="name">🏆 Максимум</div>
         <span class="value">${maxVal}</span>
@@ -1136,13 +1187,13 @@
       </div>
     `;
 
-      names.forEach(name => {
-        const count = totals[name] || 0;
-        const percent = maxVal > 0 ? (count / maxVal) * 100 : 0;
-        let colorClass = '';
-        if (percent >= 80) colorClass = 'green';
-        else if (percent >= 50) colorClass = 'yellow';
-        html += `
+        names.forEach(name => {
+          const count = totals[name] || 0;
+          const percent = maxVal > 0 ? (count / maxVal) * 100 : 0;
+          let colorClass = '';
+          if (percent >= 80) colorClass = 'green';
+          else if (percent >= 50) colorClass = 'yellow';
+          html += `
       <div class="stats-card">
         <div class="name">${name}</div>
         <span class="value">${count}</span>
@@ -1152,263 +1203,300 @@
         </div>
       </div>
     `;
-      });
+        });
 
-      container.innerHTML = html;
-      section.style.display = 'block';
-      document.getElementById('stats-count').textContent = `(${names.length} чел.)`;
-      drawPieChart(canvas, names, totals);
-    }
-
-    // ---------- Круговая диаграмма ----------
-    function drawPieChart(canvas, labels, data) {
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const values = labels.map(name => data[name] || 0);
-      const total = values.reduce((a, b) => a + b, 0);
-
-      const container = canvas.parentElement;
-      const containerWidth = container.clientWidth || 400;
-      const size = Math.min(containerWidth, 400);
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = size * dpr;
-      canvas.height = size * dpr;
-      canvas.style.width = size + 'px';
-      canvas.style.height = size + 'px';
-      ctx.scale(dpr, dpr);
-
-      const cx = size / 2;
-      const cy = size / 2;
-      const radius = Math.min(size * 0.38, 180);
-
-      ctx.clearRect(0, 0, size, size);
-
-      if (total === 0) {
-        ctx.fillStyle = '#64748b';
-        ctx.font = '16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Нет дежурств', cx, cy);
-        return;
+        container.innerHTML = html;
+        section.style.display = 'block';
+        document.getElementById('stats-count').textContent = `(${names.length} чел.)`;
+        drawPieChart(canvas, names, totals);
       }
 
-      const colors = [
-        '#4f46e5', '#22c55e', '#eab308', '#ef4444', '#8b5cf6',
-        '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
-        '#06b6d4', '#d946ef', '#f59e0b', '#10b981', '#3b82f6'
-      ];
+      // ---------- Круговая диаграмма ----------
+      function drawPieChart(canvas, labels, data) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const values = labels.map(name => data[name] || 0);
+        const total = values.reduce((a, b) => a + b, 0);
 
-      let startAngle = -Math.PI / 2;
-      const legendItems = [];
+        const container = canvas.parentElement;
+        const containerWidth = container.clientWidth || 400;
+        const size = Math.min(containerWidth, 400);
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = size * dpr;
+        canvas.height = size * dpr;
+        canvas.style.width = size + 'px';
+        canvas.style.height = size + 'px';
+        ctx.scale(dpr, dpr);
 
-      for (let i = 0; i < labels.length; i++) {
-        const val = values[i];
-        if (val === 0) continue;
-        const sliceAngle = (val / total) * 2 * Math.PI;
-        const endAngle = startAngle + sliceAngle;
-        const color = colors[i % colors.length];
+        const cx = size / 2;
+        const cy = size / 2;
+        const radius = Math.min(size * 0.38, 180);
 
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, radius, startAngle, endAngle);
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        ctx.clearRect(0, 0, size, size);
 
-        const percent = ((val / total) * 100).toFixed(1);
-        const midAngle = startAngle + sliceAngle / 2;
-        const labelRadius = radius * 0.7;
-        const x = cx + Math.cos(midAngle) * labelRadius;
-        const y = cy + Math.sin(midAngle) * labelRadius;
-        ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(percent + '%', x, y);
+        if (total === 0) {
+          ctx.fillStyle = '#64748b';
+          ctx.font = '16px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Нет дежурств', cx, cy);
+          return;
+        }
 
-        legendItems.push({ label: labels[i], color, value: val, percent });
-        startAngle = endAngle;
-      }
+        const colors = [
+          '#4f46e5', '#22c55e', '#eab308', '#ef4444', '#8b5cf6',
+          '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+          '#06b6d4', '#d946ef', '#f59e0b', '#10b981', '#3b82f6'
+        ];
 
-      const legendContainer = document.getElementById('chart-container');
-      let legendHTML = '<div class="legend">';
-      legendItems.forEach(item => {
-        legendHTML += `
+        let startAngle = -Math.PI / 2;
+        const legendItems = [];
+
+        for (let i = 0; i < labels.length; i++) {
+          const val = values[i];
+          if (val === 0) continue;
+          const sliceAngle = (val / total) * 2 * Math.PI;
+          const endAngle = startAngle + sliceAngle;
+          const color = colors[i % colors.length];
+
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.arc(cx, cy, radius, startAngle, endAngle);
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          const percent = ((val / total) * 100).toFixed(1);
+          const midAngle = startAngle + sliceAngle / 2;
+          const labelRadius = radius * 0.7;
+          const x = cx + Math.cos(midAngle) * labelRadius;
+          const y = cy + Math.sin(midAngle) * labelRadius;
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'bold 12px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(percent + '%', x, y);
+
+          legendItems.push({ label: labels[i], color, value: val, percent });
+          startAngle = endAngle;
+        }
+
+        const legendContainer = document.getElementById('chart-container');
+        let legendHTML = '<div class="legend">';
+        legendItems.forEach(item => {
+          legendHTML += `
       <div class="legend-item">
         <span class="legend-color" style="background:${item.color};"></span>
         ${item.label} (${item.value} — ${item.percent}%)
       </div>
     `;
-      });
-      legendHTML += '</div>';
-      const oldLegend = legendContainer.querySelector('.legend');
-      if (oldLegend) oldLegend.remove();
-      legendContainer.appendChild(createElementFromHTML(legendHTML));
-    }
-
-    function createElementFromHTML(htmlString) {
-      const div = document.createElement('div');
-      div.innerHTML = htmlString.trim();
-      return div.firstElementChild;
-    }
-
-    // ---------- Репертуар ----------
-    function renderRepertoire() {
-      const futureContainer = document.getElementById('repertoire-future-container');
-      const pastContainer = document.getElementById('repertoire-past-container');
-      const paginationEl = document.getElementById('repertoire-pagination');
-      const futureCount = document.getElementById('repertoire-future-count');
-      const pastCount = document.getElementById('repertoire-past-count');
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const future = [];
-      const past = [];
-
-      Object.keys(repertoireData).forEach(dateStr => {
-        const d = parseDateDDMMYYYY(dateStr);
-        if (!d) {
-          future.push({ dateStr, ...repertoireData[dateStr] });
-          return;
-        }
-        d.setHours(0, 0, 0, 0);
-        if (d >= today) {
-          future.push({ dateStr, ...repertoireData[dateStr] });
-        } else {
-          past.push({ dateStr, ...repertoireData[dateStr] });
-        }
-      });
-
-      future.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
-      past.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
-
-      repertoireFuture = future;
-      repertoirePast = past;
-      repertoireCurrentPage = 0;
-
-      futureCount.textContent = `(${future.length})`;
-      pastCount.textContent = `(${past.length})`;
-
-      renderRepertoireFuture();
-      renderRepertoirePast();
-    }
-
-    function renderRepertoireFuture() {
-      const container = document.getElementById('repertoire-future-container');
-      const paginationEl = document.getElementById('repertoire-pagination');
-
-      if (repertoireFuture.length === 0) {
-        container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Нет предстоящих дат в репертуаре.</p>';
-        paginationEl.innerHTML = '';
-        return;
+        });
+        legendHTML += '</div>';
+        const oldLegend = legendContainer.querySelector('.legend');
+        if (oldLegend) oldLegend.remove();
+        legendContainer.appendChild(createElementFromHTML(legendHTML));
       }
 
-      const totalPages = Math.ceil(repertoireFuture.length / REPERTOIRE_PAGE_SIZE);
-      if (repertoireCurrentPage >= totalPages) repertoireCurrentPage = totalPages - 1;
-      if (repertoireCurrentPage < 0) repertoireCurrentPage = 0;
+      function createElementFromHTML(htmlString) {
+        const div = document.createElement('div');
+        div.innerHTML = htmlString.trim();
+        return div.firstElementChild;
+      }
 
-      const start = repertoireCurrentPage * REPERTOIRE_PAGE_SIZE;
-      const end = Math.min(start + REPERTOIRE_PAGE_SIZE, repertoireFuture.length);
-      const pageItems = repertoireFuture.slice(start, end);
+      // ---------- Репертуар ----------
+      function renderRepertoire() {
+        const futureContainer = document.getElementById('repertoire-future-container');
+        const pastContainer = document.getElementById('repertoire-past-container');
+        const paginationEl = document.getElementById('repertoire-pagination');
+        const futureCount = document.getElementById('repertoire-future-count');
+        const pastCount = document.getElementById('repertoire-past-count');
 
-      container.innerHTML = buildRepertoireTableHTML(pageItems);
-      paginationEl.innerHTML = `
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const future = [];
+        const past = [];
+
+        Object.keys(repertoireData).forEach(dateStr => {
+          const d = parseDateDDMMYYYY(dateStr);
+          if (!d) {
+            future.push({ dateStr, ...repertoireData[dateStr] });
+            return;
+          }
+          d.setHours(0, 0, 0, 0);
+          if (d >= today) {
+            future.push({ dateStr, ...repertoireData[dateStr] });
+          } else {
+            past.push({ dateStr, ...repertoireData[dateStr] });
+          }
+        });
+
+        future.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
+        past.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
+
+        repertoireFuture = future;
+        repertoirePast = past;
+        repertoireCurrentPage = 0;
+
+        futureCount.textContent = `(${future.length})`;
+
+        renderRepertoireFuture();
+      }
+
+      function renderRepertoireFuture() {
+        const container = document.getElementById('repertoire-future-container');
+        const paginationEl = document.getElementById('repertoire-pagination');
+
+        if (repertoireFuture.length === 0) {
+          container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Нет предстоящих дат в репертуаре.</p>';
+          paginationEl.innerHTML = '';
+          return;
+        }
+
+        const totalPages = Math.ceil(repertoireFuture.length / REPERTOIRE_PAGE_SIZE);
+        if (repertoireCurrentPage >= totalPages) repertoireCurrentPage = totalPages - 1;
+        if (repertoireCurrentPage < 0) repertoireCurrentPage = 0;
+
+        const start = repertoireCurrentPage * REPERTOIRE_PAGE_SIZE;
+        const end = Math.min(start + REPERTOIRE_PAGE_SIZE, repertoireFuture.length);
+        const pageItems = repertoireFuture.slice(start, end);
+
+        container.innerHTML = buildRepertoireTableHTML(pageItems);
+        paginationEl.innerHTML = `
       <button class="prev" ${repertoireCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
       <span>${repertoireCurrentPage + 1} / ${totalPages}</span>
       <button class="next" ${repertoireCurrentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
     `;
-      paginationEl.querySelector('.prev').addEventListener('click', () => {
-        if (repertoireCurrentPage > 0) { repertoireCurrentPage--; renderRepertoireFuture(); }
-      });
-      paginationEl.querySelector('.next').addEventListener('click', () => {
-        if (repertoireCurrentPage < totalPages - 1) { repertoireCurrentPage++; renderRepertoireFuture(); }
-      });
+        paginationEl.querySelector('.prev').addEventListener('click', () => {
+          if (repertoireCurrentPage > 0) { repertoireCurrentPage--; renderRepertoireFuture(); }
+        });
+        paginationEl.querySelector('.next').addEventListener('click', () => {
+          if (repertoireCurrentPage < totalPages - 1) { repertoireCurrentPage++; renderRepertoireFuture(); }
+        });
 
-      attachCopyEvents();
-      attachRepertoireEvents();
+        attachCopyEvents();
+        attachRepertoireEvents();
 
-      container.querySelectorAll('.add-song-to-date-btn').forEach(btn => {
-        btn.removeEventListener('click', addSongToDateHandler);
-        btn.addEventListener('click', addSongToDateHandler);
-      });
-    }
-
-    function addSongToDateHandler(e) {
-      const date = this.dataset.date;
-      openAddRepertoireSongModal(date);
-    }
-
-    function renderRepertoirePast() {
-      const container = document.getElementById('repertoire-past-container');
-      if (repertoirePast.length === 0) {
-        container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Архив репертуара пуст.</p>';
-        return;
-      }
-      container.innerHTML = buildRepertoireTableHTML(repertoirePast, true);
-      attachCopyEvents();
-      attachRepertoireEvents();
-    }
-
-    function attachRepertoireEvents() {
-      // Копирование текста
-      document.querySelectorAll('.copy-song-text-btn').forEach(btn => {
-        btn.removeEventListener('click', copySongTextHandler);
-        btn.addEventListener('click', copySongTextHandler);
-      });
-      // Удаление песни из репертуара (только админ)
-      if (isAdmin) {
-        document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
-          btn.removeEventListener('click', deleteRepertoireSongHandler);
-          btn.addEventListener('click', deleteRepertoireSongHandler);
+        container.querySelectorAll('.add-song-to-date-btn').forEach(btn => {
+          btn.removeEventListener('click', addSongToDateHandler);
+          btn.addEventListener('click', addSongToDateHandler);
         });
       }
-    }
 
-    async function copySongTextHandler(e) {
-      const text = this.dataset.text;
-      try {
-        await navigator.clipboard.writeText(text);
-        const original = this.textContent;
-        this.textContent = '✅ Скопировано!';
-        setTimeout(() => { this.textContent = original; }, 2000);
-      } catch (err) {
-        alert('Не удалось скопировать текст');
+      function addSongToDateHandler(e) {
+        const date = this.dataset.date;
+        openAddRepertoireSongModal(date);
       }
-    }
 
-    async function deleteRepertoireSongHandler(e) {
-      const date = this.dataset.date;
-      const songName = this.dataset.song;
-      if (!confirm(`Удалить песню "${songName}" с даты ${date}?`)) return;
-      try {
-        showGlobalLoader();
+      function attachRepertoireEvents() {
+        // Копирование текста
+        document.querySelectorAll('.copy-song-text-btn').forEach(btn => {
+          btn.removeEventListener('click', copySongTextHandler);
+          btn.addEventListener('click', copySongTextHandler);
+        });
+        // Удаление песни из репертуара (только админ)
+        if (isAdmin) {
+          document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
+            btn.removeEventListener('click', deleteRepertoireSongHandler);
+            btn.addEventListener('click', deleteRepertoireSongHandler);
+
+            // Перемещение вверх
+            document.querySelectorAll('.move-song-up-btn').forEach(btn => {
+              btn.removeEventListener('click', moveSongUpHandler);
+              btn.addEventListener('click', moveSongUpHandler);
+            });
+            // Перемещение вниз
+            document.querySelectorAll('.move-song-down-btn').forEach(btn => {
+              btn.removeEventListener('click', moveSongDownHandler);
+              btn.addEventListener('click', moveSongDownHandler);
+            });
+          });
+        }
+      }
+
+      async function copySongTextHandler(e) {
+        const text = this.dataset.text;
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = this.textContent;
+          this.textContent = '✅ Скопировано!';
+          setTimeout(() => { this.textContent = original; }, 2000);
+        } catch (err) {
+          alert('Не удалось скопировать текст');
+        }
+      }
+
+      async function deleteRepertoireSongHandler(e) {
+        const date = this.dataset.date;
+        const songName = this.dataset.song;
+        if (!confirm(`Удалить песню "${songName}" с даты ${date}?`)) return;
+        try {
+          showGlobalLoader();
+          const entry = repertoireData[date];
+          if (!entry) throw new Error('Дата не найдена');
+          const currentSongs = entry.songs || [];
+          const newSongs = currentSongs.filter(s => s.name !== songName);
+          await setRepertoireSongs(date, newSongs.map(s => s.name), currentUser, currentPin);
+          await refreshRepertoire();
+        } catch (e) {
+          alert('Ошибка: ' + e.message);
+        } finally {
+          hideGlobalLoader();
+        }
+      }
+
+      async function moveSongUpHandler(e) {
+        const date = this.dataset.date;
+        const songName = this.dataset.song;
         const entry = repertoireData[date];
-        if (!entry) throw new Error('Дата не найдена');
-        const currentSongs = entry.songs || [];
-        const newSongs = currentSongs.filter(s => s.name !== songName);
-        await setRepertoireSongs(date, newSongs.map(s => s.name), currentUser, currentPin);
-        await refreshRepertoire();
-        alert('Песня удалена из репертуара');
-      } catch (e) {
-        alert('Ошибка: ' + e.message);
-      } finally {
-        hideGlobalLoader();
+        if (!entry) return;
+        const songs = entry.songs || [];
+        const index = songs.findIndex(s => s.name === songName);
+        if (index <= 0) return;
+        [songs[index], songs[index - 1]] = [songs[index - 1], songs[index]];
+        try {
+          showGlobalLoader();
+          await setRepertoireSongs(date, songs.map(s => s.name), currentUser, currentPin);
+          await refreshRepertoire();
+        } catch (e) {
+          alert('Ошибка изменения порядка: ' + e.message);
+        } finally {
+          hideGlobalLoader();
+        }
       }
-    }
 
-    function buildRepertoireTableHTML(items, isArchive = false) {
-      if (!items || items.length === 0) return '';
-      let html = '<div class="repertoire-grid">';
+      async function moveSongDownHandler(e) {
+        const date = this.dataset.date;
+        const songName = this.dataset.song;
+        const entry = repertoireData[date];
+        if (!entry) return;
+        const songs = entry.songs || [];
+        const index = songs.findIndex(s => s.name === songName);
+        if (index === -1 || index >= songs.length - 1) return;
+        [songs[index], songs[index + 1]] = [songs[index + 1], songs[index]];
+        try {
+          showGlobalLoader();
+          await setRepertoireSongs(date, songs.map(s => s.name), currentUser, currentPin);
+          await refreshRepertoire();
+        } catch (e) {
+          alert('Ошибка изменения порядка: ' + e.message);
+        } finally {
+          hideGlobalLoader();
+        }
+      }
 
-      items.forEach(item => {
-        const dateStr = item.dateStr;
-        const songs = item.songs || [];
-        const colors = item.colors || [];
+      function buildRepertoireTableHTML(items, isArchive = false) {
+        if (!items || items.length === 0) return '';
+        let html = '<div class="repertoire-grid">';
 
-        html += `
+        items.forEach(item => {
+          const dateStr = item.dateStr;
+          const songs = item.songs || [];
+          const colors = item.colors || [];
+
+          html += `
       <div class="repertoire-card">
         <div class="repertoire-card-header">
           <span class="repertoire-date">${dateStr}</span>
@@ -1422,7 +1510,11 @@
                 <span class="song-name">• ${song.name}</span>
                 <div class="song-actions">
                   ${song.text ? `<button class="copy-song-text-btn" data-text="${song.text.replace(/"/g, '&quot;')}" title="Копировать текст">📋</button>` : ''}
-                  ${!isArchive && isAdmin ? `<button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>` : ''}
+                  ${!isArchive && isAdmin ? `
+                    <button class="move-song-up-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вверх">↑</button>
+                    <button class="move-song-down-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вниз">↓</button>
+                    <button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>
+                  ` : ''}
                 </div>
               </div>
             `).join('') : '<div class="repertoire-empty">—</div>'}
@@ -1444,46 +1536,46 @@
         ` : ''}
       </div>
     `;
-      });
+        });
 
-      html += '</div>';
-      return html;
-    }
+        html += '</div>';
+        return html;
+      }
 
-    function attachCopyEvents() {
-      document.querySelectorAll('.copyable-song').forEach(el => {
-        el.removeEventListener('click', copySongHandler);
-        el.addEventListener('click', copySongHandler);
-      });
-    }
+      function attachCopyEvents() {
+        document.querySelectorAll('.copyable-song').forEach(el => {
+          el.removeEventListener('click', copySongHandler);
+          el.addEventListener('click', copySongHandler);
+        });
+      }
 
-    function copySongHandler(e) {
-      const text = this.textContent.replace(/^•\s*/, '').trim();
-      navigator.clipboard.writeText(text).then(() => {
-        const original = this.textContent;
-        this.textContent = '✅ ' + original;
-        setTimeout(() => {
-          this.textContent = original;
-        }, 1500);
-      }).catch(() => {
-        alert('Не удалось скопировать текст');
-      });
-    }
+      function copySongHandler(e) {
+        const text = this.textContent.replace(/^•\s*/, '').trim();
+        navigator.clipboard.writeText(text).then(() => {
+          const original = this.textContent;
+          this.textContent = '✅ ' + original;
+          setTimeout(() => {
+            this.textContent = original;
+          }, 1500);
+        }).catch(() => {
+          alert('Не удалось скопировать текст');
+        });
+      }
 
-    function getColorEmoji(colorName) {
-      const colorMap = {
-        'красный': '🔴', 'синий': '🔵', 'зеленый': '🟢', 'зелёный': '🟢',
-        'желтый': '🟡', 'жёлтый': '🟡', 'оранжевый': '🟠', 'фиолетовый': '🟣',
-        'розовый': '🌸', 'черный': '⚫', 'чёрный': '⚫', 'белый': '⚪',
-        'серый': '🔘', 'коричневый': '🟤'
-      };
-      const lower = colorName.toLowerCase().trim();
-      return colorMap[lower] || '🎨';
-    }
+      function getColorEmoji(colorName) {
+        const colorMap = {
+          'красный': '🔴', 'синий': '🔵', 'зеленый': '🟢', 'зелёный': '🟢',
+          'желтый': '🟡', 'жёлтый': '🟡', 'оранжевый': '🟠', 'фиолетовый': '🟣',
+          'розовый': '🌸', 'черный': '⚫', 'чёрный': '⚫', 'белый': '⚪',
+          'серый': '🔘', 'коричневый': '🟤'
+        };
+        const lower = colorName.toLowerCase().trim();
+        return colorMap[lower] || '🎨';
+      }
 
-    // Запуск
-    loadData();
-  </script>
+      // Запуск
+      loadData();
+    </script>
 </body>
 
 </html>
