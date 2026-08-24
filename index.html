@@ -150,21 +150,14 @@
           <button class="modal-close-btn" id="songs-modal-close">✕</button>
         </div>
         <div class="modal-body">
-          <div style="margin-bottom:20px;">
-            <h4 style="margin-bottom:8px;">Добавить новую песню</h4>
-            <input type="text" id="new-song-name" placeholder="Название песни" class="modal-input">
-            <textarea id="new-song-text" placeholder="Текст песни (по желанию)" rows="3"
-              class="modal-textarea"></textarea>
-            <button id="add-song-btn" class="btn-primary" style="margin-top:8px;">Добавить</button>
-            <div id="add-song-error" class="modal-error"></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h4 style="margin:0;">Список песен</h4>
+            <button id="open-add-song-btn" class="btn-primary" style="padding:6px 14px;">➕ Добавить</button>
           </div>
-          <div>
-            <h4 style="margin-bottom:8px;">Список песен</h4>
-            <input type="text" id="songs-filter-input" placeholder="Фильтр по названию" class="modal-input"
-              style="margin-bottom:8px;">
-            <div id="songs-list-container"></div>
-            <div id="songs-pagination" class="pagination" style="margin-top:12px;"></div>
-          </div>
+          <input type="text" id="songs-filter-input" placeholder="Фильтр по названию" class="modal-input"
+            style="margin-bottom:8px;">
+          <div id="songs-list-container"></div>
+          <div id="songs-pagination" class="pagination" style="margin-top:12px;"></div>
         </div>
       </div>
     </div>
@@ -185,6 +178,28 @@
         <div class="modal-footer">
           <button class="btn-secondary" id="edit-song-cancel">Отмена</button>
           <button class="btn-primary" id="edit-song-save">💾 Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно добавления новой песни (отдельное) -->
+    <div id="add-song-modal" class="modal-overlay">
+      <div class="modal-content wide" style="max-width:600px;">
+        <div class="modal-header">
+          <h3>➕ Добавить новую песню</h3>
+          <button class="modal-close-btn" id="add-song-modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <label style="display:block; margin-top:8px;">Название песни</label>
+          <input type="text" id="add-song-name-input" placeholder="Введите название" class="modal-input">
+          <label style="display:block; margin-top:12px;">Текст песни (по желанию)</label>
+          <textarea id="add-song-text-input" placeholder="Введите текст песни..." rows="5"
+            class="modal-textarea"></textarea>
+          <div id="add-song-modal-error" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="add-song-modal-cancel">Отмена</button>
+          <button class="btn-primary" id="add-song-modal-save">💾 Добавить</button>
         </div>
       </div>
     </div>
@@ -668,8 +683,6 @@
       async function showSongsModal() {
         if (!isAdmin) return;
         const modal = document.getElementById('songs-modal');
-        const error = document.getElementById('add-song-error');
-        error.style.display = 'none';
 
         showGlobalLoader();
         let songs = [];
@@ -683,42 +696,56 @@
           hideGlobalLoader();
         }
         allSongs = songs;
-
         filteredSongs = allSongs;
         songsCurrentPage = 0;
         renderSongsList();
-
         modal.style.display = 'flex';
-
-        document.getElementById('add-song-btn').onclick = async () => {
-          const nameInput = document.getElementById('new-song-name');
-          const textInput = document.getElementById('new-song-text');
-          const name = nameInput.value.trim();
-          const text = textInput.value.trim();
-          if (!name) {
-            document.getElementById('add-song-error').textContent = 'Введите название';
-            document.getElementById('add-song-error').style.display = 'block';
-            return;
-          }
-          document.getElementById('add-song-error').style.display = 'none';
-          try {
-            showGlobalLoader();
-            await addNewSong(name, text, currentUser, currentPin);
-            alert('Песня добавлена');
-            nameInput.value = '';
-            textInput.value = '';
-            await showSongsModal();
-          } catch (e) {
-            document.getElementById('add-song-error').textContent = e.message;
-            document.getElementById('add-song-error').style.display = 'block';
-          } finally {
-            hideGlobalLoader();
-          }
-        };
-
-        document.getElementById('songs-modal-close').onclick = () => modal.style.display = 'none';
-        modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
       }
+
+      document.getElementById('open-add-song-btn').addEventListener('click', openAddSongModal);
+
+      function openAddSongModal() {
+        const modal = document.getElementById('add-song-modal');
+        document.getElementById('add-song-name-input').value = '';
+        document.getElementById('add-song-text-input').value = '';
+        document.getElementById('add-song-modal-error').style.display = 'none';
+        modal.style.display = 'flex';
+        document.getElementById('add-song-name-input').focus();
+      }
+
+      document.getElementById('add-song-modal-close').addEventListener('click', () => {
+        closeModal(document.getElementById('add-song-modal'));
+      });
+      document.getElementById('add-song-modal-cancel').addEventListener('click', () => {
+        closeModal(document.getElementById('add-song-modal'));
+      });
+
+      document.getElementById('add-song-modal-save').addEventListener('click', async () => {
+        const nameInput = document.getElementById('add-song-name-input');
+        const textInput = document.getElementById('add-song-text-input');
+        const error = document.getElementById('add-song-modal-error');
+        const name = nameInput.value.trim();
+        const text = textInput.value.trim();
+        if (!name) {
+          error.textContent = 'Введите название песни';
+          error.style.display = 'block';
+          return;
+        }
+        error.style.display = 'none';
+        try {
+          showGlobalLoader();
+          await addNewSong(name, text, currentUser, currentPin);
+          alert('Песня добавлена');
+          closeModal(document.getElementById('add-song-modal'));
+          // Обновляем список в окне управления
+          await showSongsModal();
+        } catch (e) {
+          error.textContent = e.message;
+          error.style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      });
 
       function renderSongsList() {
         const container = document.getElementById('songs-list-container');
