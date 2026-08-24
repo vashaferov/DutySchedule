@@ -32,7 +32,6 @@
         <button id="admin-panel-btn"
           style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">👥
           Управление пользователями</button>
-        
         <button id="theme-toggle" class="theme-toggle">🌙</button>
       </div>
     </div>
@@ -71,8 +70,6 @@
         <div id="main-pagination" class="pagination"></div>
       </div>
 
-
-
       <div id="stats-section" class="section" style="display:none;">
         <div class="section-title">
           📊 Статистика дежурств
@@ -100,8 +97,8 @@
           🎵 Актуальный репертуар
           <span class="count" id="repertoire-future-count"></span>
           <button id="manage-songs-btn"
-          style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">🎵
-          Управление песнями</button>
+            style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">🎵
+            Управление песнями</button>
         </div>
         <div id="repertoire-future-container"></div>
         <div id="repertoire-pagination" class="pagination"></div>
@@ -145,7 +142,7 @@
       </div>
     </div>
 
-    <!-- Модальное окно управления песнями -->
+    <!-- Модальное окно добавления новой песни -->
     <div id="songs-modal" class="modal-overlay">
       <div class="modal-content wide">
         <div class="modal-header">
@@ -162,12 +159,32 @@
             <div id="add-song-error" class="modal-error"></div>
           </div>
           <div>
-            <h4 style="margin-bottom:8px;">Редактировать песни</h4>
+            <h4 style="margin-bottom:8px;">Список песен</h4>
             <input type="text" id="songs-filter-input" placeholder="Фильтр по названию" class="modal-input"
               style="margin-bottom:8px;">
             <div id="songs-list-container"></div>
             <div id="songs-pagination" class="pagination" style="margin-top:12px;"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно редактирования песни -->
+    <div id="edit-song-modal" class="modal-overlay">
+      <div class="modal-content wide" style="max-width:900px;">
+        <div class="modal-header">
+          <h3 id="edit-song-title">✏️ Редактирование песни</h3>
+          <button class="modal-close-btn" id="edit-song-close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="color:var(--text-muted); margin-bottom:8px;"><strong id="edit-song-name-display"></strong></p>
+          <textarea id="edit-song-textarea" rows="12" class="modal-textarea"
+            style="min-height:300px; font-size:1rem; line-height:1.6;"></textarea>
+          <div id="edit-song-error" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="edit-song-cancel">Отмена</button>
+          <button class="btn-primary" id="edit-song-save">💾 Сохранить</button>
         </div>
       </div>
     </div>
@@ -212,6 +229,7 @@
       let allSongs = [];
       let songsCurrentPage = 0;
       let filteredSongs = [];
+      let currentEditSongName = '';
 
       // ---------- Глобальный индикатор загрузки ----------
       let loaderTimeout = null;
@@ -366,19 +384,16 @@
         updateRowStates('main-table-container');
       }
 
-      // Попытка автоматического входа при загрузке
       async function autoLogin() {
         const savedUser = localStorage.getItem('currentUser');
         const savedPin = localStorage.getItem('currentUserPin');
         if (!savedUser || !savedPin) return;
         const valid = await verifyPinOnServer(savedUser, savedPin);
         if (valid) {
-          // Проверяем, является ли пользователь администратором
           try {
             const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(savedUser)}&adminPin=${encodeURIComponent(savedPin)}`);
             const data = await resp.json();
             if (!data.error) {
-              // Пользователь админ
               isAdmin = true;
             } else {
               isAdmin = false;
@@ -406,7 +421,6 @@
         const confirmBtn = document.getElementById('login-confirm');
         const cancelBtn = document.getElementById('login-cancel');
 
-        // Загружаем список имён (массив строк)
         showGlobalLoader();
         let namesList = [];
         try {
@@ -446,7 +460,6 @@
             error.style.display = 'block';
             return;
           }
-          // Меняем текст кнопки
           const originalText = confirmBtn.textContent;
           confirmBtn.textContent = '⏳ Проверка...';
           confirmBtn.disabled = true;
@@ -518,12 +531,12 @@
         html += '<tr><th style="text-align:left; padding:8px;">Имя</th><th style="text-align:left; padding:8px;">Новый PIN</th><th style="text-align:left; padding:8px;">Действие</th></tr>';
         userList.forEach(u => {
           html += `
-      <tr>
-        <td style="padding:8px;">${u.name}</td>
-        <td style="padding:8px;"><input type="text" class="admin-pin-input" data-name="${u.name}" placeholder="Введите новый PIN" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></td>
-        <td style="padding:8px;"><button class="admin-save-pin" data-name="${u.name}" style="padding:6px 14px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;">Сохранить</button></td>
-      </tr>
-    `;
+          <tr>
+            <td style="padding:8px;">${u.name}</td>
+            <td style="padding:8px;"><input type="text" class="admin-pin-input" data-name="${u.name}" placeholder="Введите новый PIN" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></td>
+            <td style="padding:8px;"><button class="admin-save-pin" data-name="${u.name}" style="padding:6px 14px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;">Сохранить</button></td>
+          </tr>
+          `;
         });
         html += '</table>';
         container.innerHTML = html;
@@ -557,7 +570,6 @@
               } else {
                 alert('PIN для ' + name + ' успешно обновлён!');
                 document.getElementById('admin-modal-close').click();
-                // Обновим список
                 document.getElementById('admin-panel-btn').click();
               }
             } catch (e) {
@@ -650,13 +662,12 @@
         return true;
       }
 
-      // ---------- Модальное окно управления песнями ----------
+      // ---------- Модальное окно управления песнями (добавление + список) ----------
       let currentRepertoireDate = '';
 
       async function showSongsModal() {
         if (!isAdmin) return;
         const modal = document.getElementById('songs-modal');
-        const container = document.getElementById('songs-list-container');
         const error = document.getElementById('add-song-error');
         error.style.display = 'none';
 
@@ -672,10 +683,6 @@
           hideGlobalLoader();
         }
         allSongs = songs;
-
-        filteredSongs = allSongs;
-        songsCurrentPage = 0;
-        renderSongsList();
 
         filteredSongs = allSongs;
         songsCurrentPage = 0;
@@ -731,37 +738,31 @@
         } else {
           pageItems.forEach(song => {
             const div = document.createElement('div');
-            div.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:8px;';
+            div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 4px; border-bottom:1px solid var(--border-color);';
             const nameSpan = document.createElement('span');
             nameSpan.textContent = song.name;
-            nameSpan.style.cssText = 'flex:0 0 150px; font-weight:500;';
-            const textArea = document.createElement('textarea');
-            textArea.value = song.text;
-            textArea.style.cssText = 'flex:1; padding:4px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary); min-height:40px;';
-            textArea.dataset.name = song.name;
-            const saveBtn = document.createElement('button');
-            saveBtn.textContent = 'Сохранить';
-            saveBtn.style.cssText = 'padding:4px 12px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;';
-            saveBtn.addEventListener('click', async () => {
-              const newText = textArea.value;
-              try {
-                showGlobalLoader();
-                await updateSongTextOnServer(song.name, newText, currentUser, currentPin);
-                await showSongsModal();
-              } catch (e) {
-                alert('Ошибка: ' + e.message);
-              } finally {
-                hideGlobalLoader();
-              }
+            nameSpan.style.cssText = 'font-weight:500; font-size:1rem;';
+            const actionsDiv = document.createElement('div');
+            actionsDiv.style.cssText = 'display:flex; gap:8px;';
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '✏️';
+            editBtn.style.cssText = 'padding:4px 8px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;';
+            editBtn.title = 'Редактировать текст песни';
+            editBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              openEditSongModal(song.name);
             });
             const deleteBtn = document.createElement('button');
             deleteBtn.textContent = '🗑️';
             deleteBtn.style.cssText = 'padding:4px 8px; border:none; border-radius:4px; background:#ef4444; color:#fff; cursor:pointer;';
-            deleteBtn.addEventListener('click', async () => {
+            deleteBtn.title = 'Удалить песню';
+            deleteBtn.addEventListener('click', async (e) => {
+              e.stopPropagation();
               if (!confirm('Удалить песню "' + song.name + '"?')) return;
               try {
                 showGlobalLoader();
                 await deleteSongOnServer(song.name, currentUser, currentPin);
+                alert('Песня удалена');
                 await showSongsModal();
               } catch (e) {
                 alert('Ошибка: ' + e.message);
@@ -769,15 +770,14 @@
                 hideGlobalLoader();
               }
             });
+            actionsDiv.appendChild(editBtn);
+            actionsDiv.appendChild(deleteBtn);
             div.appendChild(nameSpan);
-            div.appendChild(textArea);
-            div.appendChild(saveBtn);
-            div.appendChild(deleteBtn);
+            div.appendChild(actionsDiv);
             container.appendChild(div);
           });
         }
 
-        // Пагинация
         paginationEl.innerHTML = `
           <button class="prev" ${songsCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
           <span>${songsCurrentPage + 1} / ${totalPages}</span>
@@ -791,10 +791,56 @@
         });
       }
 
-      // Обработчик фильтра
       document.getElementById('songs-filter-input').addEventListener('input', function () {
         songsCurrentPage = 0;
         renderSongsList();
+      });
+
+      // ---------- Модальное окно редактирования песни ----------
+      function openEditSongModal(songName) {
+        const modal = document.getElementById('edit-song-modal');
+        const nameDisplay = document.getElementById('edit-song-name-display');
+        const textarea = document.getElementById('edit-song-textarea');
+        const error = document.getElementById('edit-song-error');
+        error.style.display = 'none';
+
+        const song = allSongs.find(s => s.name === songName);
+        if (!song) {
+          alert('Песня не найдена');
+          return;
+        }
+        currentEditSongName = songName;
+        nameDisplay.textContent = songName;
+        textarea.value = song.text || '';
+        modal.style.display = 'flex';
+        textarea.focus();
+      }
+
+      document.getElementById('edit-song-close-btn').addEventListener('click', () => {
+        closeModal(document.getElementById('edit-song-modal'));
+      });
+
+      document.getElementById('edit-song-cancel').addEventListener('click', () => {
+        closeModal(document.getElementById('edit-song-modal'));
+      });
+
+      document.getElementById('edit-song-save').addEventListener('click', async () => {
+        const textarea = document.getElementById('edit-song-textarea');
+        const error = document.getElementById('edit-song-error');
+        const newText = textarea.value;
+        try {
+          showGlobalLoader();
+          await updateSongTextOnServer(currentEditSongName, newText, currentUser, currentPin);
+          alert('Текст песни обновлён');
+          closeModal(document.getElementById('edit-song-modal'));
+          // Обновляем список песен в окне добавления
+          await showSongsModal();
+        } catch (e) {
+          error.textContent = 'Ошибка сохранения: ' + e.message;
+          error.style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
       });
 
       // ---------- Модалка добавления песни в репертуар ----------
@@ -804,7 +850,6 @@
         const select = document.getElementById('repertoire-song-select');
         const error = document.getElementById('add-repertoire-song-error');
         error.style.display = 'none';
-        // Загружаем список всех песен (из allSongs)
         if (!allSongs.length) {
           loadSongs(currentUser, currentPin).then(songs => {
             allSongs = songs;
@@ -842,6 +887,7 @@
           await setRepertoireSongs(currentRepertoireDate, newSongs.map(s => s.name), currentUser, currentPin);
           await refreshRepertoire();
           document.getElementById('add-repertoire-song-modal').style.display = 'none';
+          alert('Песня добавлена');
         } catch (e) {
           alert('Ошибка: ' + e.message);
         } finally {
@@ -886,7 +932,6 @@
           }));
           repertoireData = repertoire || {};
 
-          // Автоматический вход
           await autoLogin();
 
           const today = new Date();
@@ -951,10 +996,10 @@
         attachMainEvents();
 
         paginationEl.innerHTML = `
-      <button class="prev" ${currentPage === 0 ? 'disabled' : ''}>← Назад</button>
-      <span>${currentPage + 1} / ${totalPages}</span>
-      <button class="next" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
-    `;
+          <button class="prev" ${currentPage === 0 ? 'disabled' : ''}>← Назад</button>
+          <span>${currentPage + 1} / ${totalPages}</span>
+          <button class="next" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
+        `;
         paginationEl.querySelector('.prev').addEventListener('click', () => {
           if (currentPage > 0) { currentPage--; renderMainTable(); }
         });
@@ -978,16 +1023,16 @@
         if (!items || items.length === 0) return '';
         const names = items[0].names;
         let html = `
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>Дата</th>
-            ${names.map(name => `<th>${name}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-  `;
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Дата</th>
+                  ${names.map(name => `<th>${name}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+        `;
 
         items.forEach(item => {
           const dateStr = item.dateStr;
@@ -998,18 +1043,18 @@
 
           html += `<tr data-date="${dateStr}">`;
           html += `
-      <td>
-        <div class="date-cell">
-          <span class="date-text">${formatDateDisplay(dateStr)}</span>
-          <div class="progress-wrapper">
-            <span>${checkedCount}/${MAX_PER_DAY}</span>
-            <div class="progress-bar">
-              <div class="progress-fill ${fillClass}" style="width:${percent}%;"></div>
-            </div>
-          </div>
-        </div>
-      </td>
-    `;
+            <td>
+              <div class="date-cell">
+                <span class="date-text">${formatDateDisplay(dateStr)}</span>
+                <div class="progress-wrapper">
+                  <span>${checkedCount}/${MAX_PER_DAY}</span>
+                  <div class="progress-bar">
+                    <div class="progress-fill ${fillClass}" style="width:${percent}%;"></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+          `;
           for (let j = 0; j < names.length; j++) {
             const checked = row[j] === true;
             const name = names[j];
@@ -1021,13 +1066,13 @@
             }
             const display = checked ? '✔' : '•';
             html += `
-        <td>
-          <span class="${cellClass}" 
-                ${!isArchive ? `data-date="${dateStr}" data-name="${name}" data-checked="${checked}"` : ''}>
-            ${display}
-          </span>
-        </td>
-      `;
+              <td>
+                <span class="${cellClass}" 
+                      ${!isArchive ? `data-date="${dateStr}" data-name="${name}" data-checked="${checked}"` : ''}>
+                  ${display}
+                </span>
+              </td>
+            `;
           }
           html += '</tr>';
         });
@@ -1121,13 +1166,12 @@
           : `Вы уверены, что хотите назначить ${name} на ${date}?`;
         if (!confirm(confirmMessage)) return;
 
-        // Оптимистичное обновление UI
         cell.dataset.checked = String(newValue);
         cell.textContent = newValue ? '✔' : '•';
         newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
         updateRowStates('main-table-container');
 
-        showGlobalLoader(); // Показываем спиннер
+        showGlobalLoader();
         try {
           const params = new URLSearchParams();
           params.append('date', date);
@@ -1143,7 +1187,6 @@
           });
         } catch (e) {
           alert('Ошибка сохранения. Попробуйте ещё раз.');
-          // Откат
           cell.dataset.checked = String(currentChecked);
           cell.textContent = currentChecked ? '✔' : '•';
           currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
@@ -1180,12 +1223,12 @@
         const maxName = Object.keys(totals).find(k => totals[k] === maxVal);
 
         let html = `
-      <div class="stats-card stats-total">
-        <div class="name">🏆 Максимум</div>
-        <span class="value">${maxVal}</span>
-        <div class="label">${maxName}</div>
-      </div>
-    `;
+          <div class="stats-card stats-total">
+            <div class="name">🏆 Максимум</div>
+            <span class="value">${maxVal}</span>
+            <div class="label">${maxName}</div>
+          </div>
+        `;
 
         names.forEach(name => {
           const count = totals[name] || 0;
@@ -1194,15 +1237,15 @@
           if (percent >= 80) colorClass = 'green';
           else if (percent >= 50) colorClass = 'yellow';
           html += `
-      <div class="stats-card">
-        <div class="name">${name}</div>
-        <span class="value">${count}</span>
-        <div class="label">дежурств</div>
-        <div class="progress-bar">
-          <div class="progress-fill-stat ${colorClass}" style="width:${percent}%;"></div>
-        </div>
-      </div>
-    `;
+            <div class="stats-card">
+              <div class="name">${name}</div>
+              <span class="value">${count}</span>
+              <div class="label">дежурств</div>
+              <div class="progress-bar">
+                <div class="progress-fill-stat ${colorClass}" style="width:${percent}%;"></div>
+              </div>
+            </div>
+          `;
         });
 
         container.innerHTML = html;
@@ -1288,11 +1331,11 @@
         let legendHTML = '<div class="legend">';
         legendItems.forEach(item => {
           legendHTML += `
-      <div class="legend-item">
-        <span class="legend-color" style="background:${item.color};"></span>
-        ${item.label} (${item.value} — ${item.percent}%)
-      </div>
-    `;
+            <div class="legend-item">
+              <span class="legend-color" style="background:${item.color};"></span>
+              ${item.label} (${item.value} — ${item.percent}%)
+            </div>
+          `;
         });
         legendHTML += '</div>';
         const oldLegend = legendContainer.querySelector('.legend');
@@ -1365,10 +1408,10 @@
 
         container.innerHTML = buildRepertoireTableHTML(pageItems);
         paginationEl.innerHTML = `
-      <button class="prev" ${repertoireCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
-      <span>${repertoireCurrentPage + 1} / ${totalPages}</span>
-      <button class="next" ${repertoireCurrentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
-    `;
+          <button class="prev" ${repertoireCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
+          <span>${repertoireCurrentPage + 1} / ${totalPages}</span>
+          <button class="next" ${repertoireCurrentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
+        `;
         paginationEl.querySelector('.prev').addEventListener('click', () => {
           if (repertoireCurrentPage > 0) { repertoireCurrentPage--; renderRepertoireFuture(); }
         });
@@ -1391,23 +1434,19 @@
       }
 
       function attachRepertoireEvents() {
-        // Копирование текста
         document.querySelectorAll('.copy-song-text-btn').forEach(btn => {
           btn.removeEventListener('click', copySongTextHandler);
           btn.addEventListener('click', copySongTextHandler);
         });
-        // Удаление песни из репертуара (только админ)
         if (isAdmin) {
           document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
             btn.removeEventListener('click', deleteRepertoireSongHandler);
             btn.addEventListener('click', deleteRepertoireSongHandler);
 
-            // Перемещение вверх
             document.querySelectorAll('.move-song-up-btn').forEach(btn => {
               btn.removeEventListener('click', moveSongUpHandler);
               btn.addEventListener('click', moveSongUpHandler);
             });
-            // Перемещение вниз
             document.querySelectorAll('.move-song-down-btn').forEach(btn => {
               btn.removeEventListener('click', moveSongDownHandler);
               btn.addEventListener('click', moveSongDownHandler);
@@ -1440,6 +1479,7 @@
           const newSongs = currentSongs.filter(s => s.name !== songName);
           await setRepertoireSongs(date, newSongs.map(s => s.name), currentUser, currentPin);
           await refreshRepertoire();
+          alert('Песня удалена из репертуара');
         } catch (e) {
           alert('Ошибка: ' + e.message);
         } finally {
@@ -1497,45 +1537,45 @@
           const colors = item.colors || [];
 
           html += `
-      <div class="repertoire-card">
-        <div class="repertoire-card-header">
-          <span class="repertoire-date">${dateStr}</span>
-          ${isArchive ? '<span class="repertoire-archive-badge">📦 Архив</span>' : ''}
-        </div>
-        <div class="repertoire-card-body">
-          <div class="repertoire-songs">
-            <div class="repertoire-section-title">🎵 Песни</div>
-            ${songs.length ? songs.map(song => `
-              <div class="repertoire-song-item">
-                <span class="song-name">• ${song.name}</span>
-                <div class="song-actions">
-                  ${song.text ? `<button class="copy-song-text-btn" data-text="${song.text.replace(/"/g, '&quot;')}" title="Копировать текст">📋</button>` : ''}
-                  ${!isArchive && isAdmin ? `
-                    <button class="move-song-up-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вверх">↑</button>
-                    <button class="move-song-down-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вниз">↓</button>
-                    <button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>
-                  ` : ''}
+            <div class="repertoire-card">
+              <div class="repertoire-card-header">
+                <span class="repertoire-date">${dateStr}</span>
+                ${isArchive ? '<span class="repertoire-archive-badge">📦 Архив</span>' : ''}
+              </div>
+              <div class="repertoire-card-body">
+                <div class="repertoire-songs">
+                  <div class="repertoire-section-title">🎵 Песни</div>
+                  ${songs.length ? songs.map(song => `
+                    <div class="repertoire-song-item">
+                      <span class="song-name">• ${song.name}</span>
+                      <div class="song-actions">
+                        ${song.text ? `<button class="copy-song-text-btn" data-text="${song.text.replace(/"/g, '&quot;')}" title="Копировать текст">📋</button>` : ''}
+                        ${!isArchive && isAdmin ? `
+                          <button class="move-song-up-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вверх">↑</button>
+                          <button class="move-song-down-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вниз">↓</button>
+                          <button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>
+                        ` : ''}
+                      </div>
+                    </div>
+                  `).join('') : '<div class="repertoire-empty">—</div>'}
+                </div>
+                <div class="repertoire-colors">
+                  <div class="repertoire-section-title">🎨 Цвета</div>
+                  ${colors.length ? colors.map(c => `
+                    <span class="repertoire-color-item">
+                      <span class="color-dot" style="background:${c.toLowerCase()}"></span>
+                      ${c}
+                    </span>
+                  `).join('') : '<div class="repertoire-empty">—</div>'}
                 </div>
               </div>
-            `).join('') : '<div class="repertoire-empty">—</div>'}
-          </div>
-          <div class="repertoire-colors">
-            <div class="repertoire-section-title">🎨 Цвета</div>
-            ${colors.length ? colors.map(c => `
-              <span class="repertoire-color-item">
-                <span class="color-dot" style="background:${c.toLowerCase()}"></span>
-                ${c}
-              </span>
-            `).join('') : '<div class="repertoire-empty">—</div>'}
-          </div>
-        </div>
-        ${!isArchive && isAdmin ? `
-          <div class="repertoire-card-footer">
-            <button class="add-song-to-date-btn" data-date="${dateStr}">+ Добавить песню</button>
-          </div>
-        ` : ''}
-      </div>
-    `;
+              ${!isArchive && isAdmin ? `
+                <div class="repertoire-card-footer">
+                  <button class="add-song-to-date-btn" data-date="${dateStr}">+ Добавить песню</button>
+                </div>
+              ` : ''}
+            </div>
+          `;
         });
 
         html += '</div>';
