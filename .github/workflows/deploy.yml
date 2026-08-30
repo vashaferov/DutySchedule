@@ -21,15 +21,17 @@ jobs:
           port: 22
           script_stop: true
           script: |
-            set -e
+            set -ex
             echo "🚀 Starting deployment..."
             echo "Current user: $(whoami)"
             echo "Home: $HOME"
 
-            # Принудительно используем docker-compose (старая версия)
+            # Проверяем git
+            git --version || { echo "❌ Git not installed!"; exit 1; }
+
             DOCKER_COMPOSE="docker-compose"
 
-            # Переходим в папку проекта в домашней директории
+            # Создаём папку проекта
             mkdir -p ~/duty
             cd ~/duty
 
@@ -39,6 +41,11 @@ jobs:
                 git pull
             else
                 echo "Cloning repository..."
+                # Если папка не пуста, но .git нет, удаляем содержимое
+                if [ "$(ls -A)" ]; then
+                    echo "Directory not empty and not a git repo, cleaning..."
+                    rm -rf ./*
+                fi
                 git clone https://github.com/${{ github.repository }} .
             fi
 
