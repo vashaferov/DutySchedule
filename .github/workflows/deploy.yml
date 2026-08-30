@@ -26,16 +26,8 @@ jobs:
             echo "Current user: $(whoami)"
             echo "Home: $HOME"
 
-            # Определяем команду Docker Compose
-            if command -v docker-compose &> /dev/null; then
-                DOCKER_COMPOSE="docker-compose"
-            elif docker compose version &> /dev/null; then
-                DOCKER_COMPOSE="docker compose"
-            else
-                echo "❌ Neither docker-compose nor docker compose found!"
-                exit 1
-            fi
-            echo "Using Docker Compose: $DOCKER_COMPOSE"
+            # Принудительно используем docker-compose (старая версия)
+            DOCKER_COMPOSE="docker-compose"
 
             # Переходим в папку проекта в домашней директории
             mkdir -p ~/duty
@@ -47,7 +39,7 @@ jobs:
                 git pull
             else
                 echo "Cloning repository..."
-                git clone https://${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} .
+                git clone https://github.com/${{ github.repository }} .
             fi
 
             # Проверяем наличие docker-compose.yml
