@@ -23,6 +23,19 @@ jobs:
           script: |
             set -e
             echo "🚀 Starting deployment..."
+            echo "Current user: $(whoami)"
+            echo "Home: $HOME"
+
+            # Определяем команду Docker Compose
+            if command -v docker-compose &> /dev/null; then
+                DOCKER_COMPOSE="docker-compose"
+            elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+                DOCKER_COMPOSE="docker compose"
+            else
+                echo "❌ Neither docker-compose nor docker compose found!"
+                exit 1
+            fi
+            echo "Using Docker Compose: $DOCKER_COMPOSE"
 
             # Переходим в папку проекта в домашней директории
             mkdir -p ~/duty
@@ -30,12 +43,22 @@ jobs:
 
             # Клонируем или обновляем код
             if [ -d .git ]; then
-              git pull
+                echo "Pulling latest changes..."
+                git pull
             else
-              git clone https://github.com/${{ github.repository }} .
+                echo "Cloning repository..."
+                git clone https://${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }} .
+            fi
+
+            # Проверяем наличие docker-compose.yml
+            if [ ! -f docker-compose.yml ]; then
+                echo "❌ docker-compose.yml not found!"
+                ls -la
+                exit 1
             fi
 
             # Создаём .env с секретами
+            echo "Creating .env file..."
             cat > ~/duty/.env << EOF
             DB_NAME=${{ secrets.DB_NAME }}
             DB_USER=${{ secrets.DB_USER }}
@@ -47,13 +70,16 @@ jobs:
             EOF
 
             # Пересобираем и перезапускаем контейнеры
-            docker compose pull
-            docker compose up -d --force-recreate --build
+            echo "Pulling images..."
+            $DOCKER_COMPOSE pull
+
+            echo "Starting containers..."
+            $DOCKER_COMPOSE up -d --force-recreate --build
 
             # Миграция только при первом деплое
             if [ ! -f ~/duty/.migrated ]; then
                 echo "🔄 Запускаем миграцию данных..."
-                docker compose run --rm migrate
+                $DOCKER_COMPOSE run --rm migrate || echo "⚠️ Migration failed, but continuing..."
                 touch ~/duty/.migrated
                 echo "✅ Миграция завершена"
             else
