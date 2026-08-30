@@ -28,12 +28,21 @@ jobs:
 
             git --version || { echo "❌ Git not installed!"; exit 1; }
 
-            DOCKER_COMPOSE="docker-compose"
+            # Определяем команду Docker Compose
+            if command -v docker-compose &> /dev/null; then
+                DOCKER_COMPOSE="docker-compose"
+            elif docker compose version &> /dev/null 2>&1; then
+                DOCKER_COMPOSE="docker compose"
+            else
+                echo "❌ Neither docker-compose nor docker compose found!"
+                exit 1
+            fi
+            echo "Using Docker Compose: $DOCKER_COMPOSE"
 
             mkdir -p ~/duty
             cd ~/duty
 
-            # Клонируем или обновляем код (с обработкой ошибки Drone)
+            # Клонируем или обновляем код
             set +e
             if [ -d .git ]; then
                 echo "Pulling latest changes..."
@@ -45,14 +54,12 @@ jobs:
             fi
             set -e
 
-            # Проверяем наличие docker-compose.yml
             if [ ! -f docker-compose.yml ]; then
                 echo "❌ docker-compose.yml not found!"
                 ls -la
                 exit 1
             fi
 
-            # Создаём .env с секретами
             echo "Creating .env file..."
             cat > ~/duty/.env << EOF
             DB_NAME=${{ secrets.DB_NAME }}
@@ -70,7 +77,6 @@ jobs:
             echo "Starting containers..."
             $DOCKER_COMPOSE up -d --force-recreate --build
 
-            # Миграция только при первом деплое
             if [ ! -f ~/duty/.migrated ]; then
                 echo "🔄 Запускаем миграцию данных..."
                 $DOCKER_COMPOSE run --rm migrate || echo "⚠️ Migration failed, but continuing..."
