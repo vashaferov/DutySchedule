@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # База данных PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: duty_postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"   # только для отладки, можно убрать
+    networks:
+      - duty_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Бэкенд FastAPI
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: duty_api
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+      GOOGLE_SHEETS_CREDENTIALS: ${GOOGLE_SHEETS_CREDENTIALS}   # base64 или mount
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - duty_network
+    restart: unless-stopped
+    # порт не публикуется, доступен только через Nginx
+
+  # Синхронизатор с Google Sheets (фоновый процесс)
+  sync:
+    build:
+      context: ./sync
+      dockerfile: Dockerfile
+    container_name: duty_sync
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      GOOGLE_SHEETS_CREDENTIALS: ${GOOGLE_SHEETS_CREDENTIALS}
+      SPREADSHEET_ID: ${SPREADSHEET_ID}
+      SYNC_INTERVAL: 60
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - duty_network
+    restart: unless-stopped
+    volumes:
+      - ./sync/credentials.json:/app/credentials.json:ro
+    ports:
+      - "127.0.0.1:8001:8001"   # доступен только локально
+    command: ["python", "sync.py", "--http"]
+
+  # Прокси Nginx (отдаёт статику и проксирует API)
+  nginx:
+    image: nginx:alpine
+    container_name: duty_nginx
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./frontend:/usr/share/nginx/html:ro
+    ports:
+      - "80:80"
+      - "443:443"   # если будет SSL
+    depends_on:
+      - api
+    networks:
+      - duty_network
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrate
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      SPREADSHEET_ID: ${SPREADSHEET_ID}
+      GOOGLE_SHEETS_CREDENTIALS: ${GOOGLE_SHEETS_CREDENTIALS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - duty_network
+    restart: "no"
+
+networks:
+  duty_network:
+    driver: bridge
+
+volumes:
+  pgdata:

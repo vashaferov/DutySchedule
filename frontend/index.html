@@ -36,6 +36,16 @@
       </div>
     </div>
 
+    <!-- Информация -->
+    <div class="info">
+      <span>ℹ️</span>
+      <span>
+        <strong>Клик</strong> по ячейке — добавить/убрать дежурного.
+        Когда выбрано <strong><span id="max-info">2</span></strong> человека, остальные блокируются.
+        Прошедшие даты перемещены в архив (только просмотр).
+      </span>
+    </div>
+
     <!-- Вкладки -->
     <div class="tabs">
       <button class="tab-btn active" data-tab="schedule">📋 График</button>
@@ -55,14 +65,6 @@
         <div class="section-title">
           🟢 Актуальные даты
           <span class="count" id="main-count"></span>
-        </div>
-        <div class="info">
-          <span>ℹ️</span>
-          <span>
-            <strong>Клик</strong> по ячейке — добавить/убрать дежурного.
-            Когда выбрано <strong><span id="max-info">2</span></strong> человека, остальные блокируются.
-            Прошедшие даты перемещены в архив (только просмотр).
-          </span>
         </div>
         <div id="main-table-container"></div>
         <div id="main-pagination" class="pagination"></div>
@@ -136,11 +138,14 @@
         <div class="modal-body">
           <div id="admin-user-list"></div>
           <div id="admin-modal-error" class="modal-error"></div>
+          <button id="sync-btn"
+            style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#f59e0b; color:#fff; cursor:pointer; font-size:0.9rem;">🔄
+            Запустить синхронизацию</button>
         </div>
       </div>
     </div>
 
-    <!-- Модальное окно добавления новой песни -->
+    <!-- Модальное окно управления песнями (список + кнопка Добавить) -->
     <div id="songs-modal" class="modal-overlay">
       <div class="modal-content wide">
         <div class="modal-header">
@@ -156,6 +161,28 @@
             style="margin-bottom:8px;">
           <div id="songs-list-container"></div>
           <div id="songs-pagination" class="pagination" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно добавления новой песни -->
+    <div id="add-song-modal" class="modal-overlay">
+      <div class="modal-content wide" style="max-width:600px;">
+        <div class="modal-header">
+          <h3>➕ Добавить новую песню</h3>
+          <button class="modal-close-btn" id="add-song-modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <label style="display:block; margin-top:8px;">Название песни</label>
+          <input type="text" id="add-song-name-input" placeholder="Введите название" class="modal-input">
+          <label style="display:block; margin-top:12px;">Текст песни (по желанию)</label>
+          <textarea id="add-song-text-input" placeholder="Введите текст песни..." rows="5"
+            class="modal-textarea"></textarea>
+          <div id="add-song-modal-error" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="add-song-modal-cancel">Отмена</button>
+          <button class="btn-primary" id="add-song-modal-save">💾 Добавить</button>
         </div>
       </div>
     </div>
@@ -176,28 +203,6 @@
         <div class="modal-footer">
           <button class="btn-secondary" id="edit-song-cancel">Отмена</button>
           <button class="btn-primary" id="edit-song-save">💾 Сохранить</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно добавления новой песни (отдельное) -->
-    <div id="add-song-modal" class="modal-overlay">
-      <div class="modal-content wide" style="max-width:600px;">
-        <div class="modal-header">
-          <h3>➕ Добавить новую песню</h3>
-          <button class="modal-close-btn" id="add-song-modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <label style="display:block; margin-top:8px;">Название песни</label>
-          <input type="text" id="add-song-name-input" placeholder="Введите название" class="modal-input">
-          <label style="display:block; margin-top:12px;">Текст песни (по желанию)</label>
-          <textarea id="add-song-text-input" placeholder="Введите текст песни..." rows="12"
-            class="modal-textarea"></textarea>
-          <div id="add-song-modal-error" class="modal-error"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="add-song-modal-cancel">Отмена</button>
-          <button class="btn-primary" id="add-song-modal-save">💾 Добавить</button>
         </div>
       </div>
     </div>
@@ -253,6 +258,7 @@
         if (loaderTimeout) clearTimeout(loaderTimeout);
         loaderTimeout = setTimeout(() => {
           hideGlobalLoader();
+          alert('Превышено время ожидания ответа от сервера. Попробуйте ещё раз.');
         }, 10000);
       }
 
@@ -320,16 +326,16 @@
         });
       });
 
-      // ---------- API-вызовы ----------
+      // ---------- API-вызовы (новые) ----------
       async function verifyPinOnServer(name, pin) {
-        const url = API_URL + '?action=verifyPin&name=' + encodeURIComponent(name) + '&pin=' + encodeURIComponent(pin);
+        const url = API_URL + '/auth/verifyPin?name=' + encodeURIComponent(name) + '&pin=' + encodeURIComponent(pin);
         const resp = await fetch(url);
         const data = await resp.json();
         return data.success === true;
       }
 
       async function loadUsers() {
-        const resp = await fetch(API_URL + '?action=getUserNames');
+        const resp = await fetch(API_URL + '/auth/getUserNames');
         const data = await resp.json();
         if (data.error) {
           console.error('Ошибка загрузки пользователей:', data.error);
@@ -339,7 +345,7 @@
       }
 
       async function loadUsersForAdmin(adminName, adminPin) {
-        const url = `${API_URL}?action=getUsers&adminName=${encodeURIComponent(adminName)}&adminPin=${encodeURIComponent(adminPin)}`;
+        const url = `${API_URL}/auth/getUsers?admin_name=${encodeURIComponent(adminName)}&admin_pin=${encodeURIComponent(adminPin)}`;
         const resp = await fetch(url);
         const data = await resp.json();
         if (data.error) {
@@ -354,6 +360,12 @@
         const userDisplay = document.getElementById('user-display');
         const logoutBtn = document.getElementById('logout-btn');
         const adminBtn = document.getElementById('admin-panel-btn');
+        const syncBtn = document.getElementById('sync-btn');
+        if (currentUser && isAdmin) {
+          syncBtn.style.display = 'inline-block';
+        } else {
+          syncBtn.style.display = 'none';
+        }
 
         if (currentUser) {
           loginBtn.style.display = 'none';
@@ -404,9 +416,8 @@
         const valid = await verifyPinOnServer(savedUser, savedPin);
         if (valid) {
           try {
-            const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(savedUser)}&adminPin=${encodeURIComponent(savedPin)}`);
-            const data = await resp.json();
-            if (!data.error) {
+            const resp = await fetch(`${API_URL}/auth/getUsers?admin_name=${encodeURIComponent(savedUser)}&admin_pin=${encodeURIComponent(savedPin)}`);
+            if (resp.ok) {
               isAdmin = true;
             } else {
               isAdmin = false;
@@ -483,9 +494,10 @@
             if (valid) {
               let admin = false;
               try {
-                const resp = await fetch(`${API_URL}?action=getUsers&adminName=${encodeURIComponent(name)}&adminPin=${encodeURIComponent(pin)}`);
-                const data = await resp.json();
-                if (!data.error) admin = true;
+                const resp = await fetch(`${API_URL}/auth/getUsers?admin_name=${encodeURIComponent(name)}&admin_pin=${encodeURIComponent(pin)}`);
+                if (resp.ok) {
+                  admin = true;
+                }
               } catch (e) { /* не админ */ }
               modal.style.display = 'none';
               setUser(name, pin, admin);
@@ -571,10 +583,8 @@
             this.disabled = true;
             showGlobalLoader();
             try {
-              const resp = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=setPin&name=${encodeURIComponent(name)}&newPin=${encodeURIComponent(newPin)}&adminName=${encodeURIComponent(currentUser)}&adminPin=${encodeURIComponent(currentPin)}`
+              const resp = await fetch(`${API_URL}/users/${encodeURIComponent(name)}/pin?new_pin=${encodeURIComponent(newPin)}&admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`, {
+                method: 'PUT'
               });
               const result = await resp.json();
               if (result.error) {
@@ -607,6 +617,23 @@
 
       document.getElementById('manage-songs-btn').addEventListener('click', showSongsModal);
 
+      document.getElementById('sync-btn').addEventListener('click', async function () {
+        if (!currentUser || !isAdmin) return;
+        try {
+          showGlobalLoader();
+          const resp = await fetch(`${API_URL}/sync/run?changer=${encodeURIComponent(currentUser)}&pin=${encodeURIComponent(currentPin)}`, {
+            method: 'POST'
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || 'Ошибка');
+          alert('Синхронизация запущена успешно!');
+        } catch (e) {
+          alert('Ошибка: ' + e.message);
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
       // ---------- Вкладки ----------
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', function () {
@@ -634,54 +661,61 @@
         return dateStr;
       }
 
-      // ---------- Управление песнями ----------
+      // ---------- Управление песнями (новые эндпоинты) ----------
       async function loadSongs(adminName, adminPin) {
-        const url = `${API_URL}?action=getSongs&adminName=${encodeURIComponent(adminName)}&adminPin=${encodeURIComponent(adminPin)}`;
-        const resp = await fetch(url);
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error);
-        return data.songs || [];
+        const resp = await fetch(API_URL + '/songs');
+        if (!resp.ok) throw new Error('Ошибка загрузки песен');
+        return await resp.json();
       }
 
       async function addNewSong(name, text, changer, pin) {
-        const body = `action=addSong&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&text=${encodeURIComponent(text)}`;
-        const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const resp = await fetch(`${API_URL}/songs?changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, text })
+        });
         const data = await resp.json();
-        if (data.error) throw new Error(data.error);
+        if (!resp.ok) throw new Error(data.detail || 'Ошибка добавления песни');
         return true;
       }
 
       async function updateSongTextOnServer(name, newText, changer, pin) {
-        const body = `action=updateSongText&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&newText=${encodeURIComponent(newText)}`;
-        const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const resp = await fetch(`${API_URL}/songs/${encodeURIComponent(name)}?new_text=${encodeURIComponent(newText)}&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
+          method: 'PUT'
+        });
         const data = await resp.json();
-        if (data.error) throw new Error(data.error);
+        if (!resp.ok) throw new Error(data.detail || 'Ошибка обновления текста');
         return true;
       }
 
       async function deleteSongOnServer(name, changer, pin) {
-        const body = `action=deleteSong&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}`;
-        const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        const resp = await fetch(`${API_URL}/songs/${encodeURIComponent(name)}?changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
+          method: 'DELETE'
+        });
         const data = await resp.json();
-        if (data.error) throw new Error(data.error);
+        if (!resp.ok) throw new Error(data.detail || 'Ошибка удаления песни');
         return true;
       }
 
-      async function setRepertoireSongs(date, songNames, changer, pin) {
-        const body = `action=setRepertoireSongs&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}&date=${encodeURIComponent(date)}&songs=${encodeURIComponent(songNames.join('\n'))}`;
-        const resp = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+      async function setRepertoireSongs(date, songItems, changer, pin) {
+        // Преобразуем в массив строк (если пришли объекты, берём name)
+        const songNames = songItems.map(item => typeof item === 'string' ? item : item.name);
+        const resp = await fetch(`${API_URL}/repertoire/${encodeURIComponent(date)}?changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ songs: songNames })
+        });
         const data = await resp.json();
-        if (data.error) throw new Error(data.error);
+        if (!resp.ok) throw new Error(data.detail || 'Ошибка обновления репертуара');
         return true;
       }
 
-      // ---------- Модальное окно управления песнями (добавление + список) ----------
+      // ---------- Модальное окно управления песнями ----------
       let currentRepertoireDate = '';
 
       async function showSongsModal() {
         if (!isAdmin) return;
         const modal = document.getElementById('songs-modal');
-
         showGlobalLoader();
         let songs = [];
         try {
@@ -699,51 +733,6 @@
         renderSongsList();
         modal.style.display = 'flex';
       }
-
-      document.getElementById('open-add-song-btn').addEventListener('click', openAddSongModal);
-
-      function openAddSongModal() {
-        const modal = document.getElementById('add-song-modal');
-        document.getElementById('add-song-name-input').value = '';
-        document.getElementById('add-song-text-input').value = '';
-        document.getElementById('add-song-modal-error').style.display = 'none';
-        modal.style.display = 'flex';
-        document.getElementById('add-song-name-input').focus();
-      }
-
-      document.getElementById('add-song-modal-close').addEventListener('click', () => {
-        closeModal(document.getElementById('add-song-modal'));
-      });
-      document.getElementById('add-song-modal-cancel').addEventListener('click', () => {
-        closeModal(document.getElementById('add-song-modal'));
-      });
-
-      document.getElementById('add-song-modal-save').addEventListener('click', async () => {
-        const nameInput = document.getElementById('add-song-name-input');
-        const textInput = document.getElementById('add-song-text-input');
-        const error = document.getElementById('add-song-modal-error');
-        const name = nameInput.value.trim();
-        const text = textInput.value.trim();
-        if (!name) {
-          error.textContent = 'Введите название песни';
-          error.style.display = 'block';
-          return;
-        }
-        error.style.display = 'none';
-        try {
-          showGlobalLoader();
-          await addNewSong(name, text, currentUser, currentPin);
-          alert('Песня добавлена');
-          closeModal(document.getElementById('add-song-modal'));
-          // Обновляем список в окне управления
-          await showSongsModal();
-        } catch (e) {
-          error.textContent = e.message;
-          error.style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      });
 
       function renderSongsList() {
         const container = document.getElementById('songs-list-container');
@@ -821,6 +810,51 @@
         renderSongsList();
       });
 
+      document.getElementById('open-add-song-btn').addEventListener('click', openAddSongModal);
+
+      // ---------- Модальное окно добавления песни ----------
+      function openAddSongModal() {
+        const modal = document.getElementById('add-song-modal');
+        document.getElementById('add-song-name-input').value = '';
+        document.getElementById('add-song-text-input').value = '';
+        document.getElementById('add-song-modal-error').style.display = 'none';
+        modal.style.display = 'flex';
+        document.getElementById('add-song-name-input').focus();
+      }
+
+      document.getElementById('add-song-modal-close').addEventListener('click', () => {
+        closeModal(document.getElementById('add-song-modal'));
+      });
+      document.getElementById('add-song-modal-cancel').addEventListener('click', () => {
+        closeModal(document.getElementById('add-song-modal'));
+      });
+
+      document.getElementById('add-song-modal-save').addEventListener('click', async () => {
+        const nameInput = document.getElementById('add-song-name-input');
+        const textInput = document.getElementById('add-song-text-input');
+        const error = document.getElementById('add-song-modal-error');
+        const name = nameInput.value.trim();
+        const text = textInput.value.trim();
+        if (!name) {
+          error.textContent = 'Введите название песни';
+          error.style.display = 'block';
+          return;
+        }
+        error.style.display = 'none';
+        try {
+          showGlobalLoader();
+          await addNewSong(name, text, currentUser, currentPin);
+          alert('Песня добавлена');
+          closeModal(document.getElementById('add-song-modal'));
+          await showSongsModal();
+        } catch (e) {
+          error.textContent = e.message;
+          error.style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
       // ---------- Модальное окно редактирования песни ----------
       function openEditSongModal(songName) {
         const modal = document.getElementById('edit-song-modal');
@@ -844,7 +878,6 @@
       document.getElementById('edit-song-close-btn').addEventListener('click', () => {
         closeModal(document.getElementById('edit-song-modal'));
       });
-
       document.getElementById('edit-song-cancel').addEventListener('click', () => {
         closeModal(document.getElementById('edit-song-modal'));
       });
@@ -858,7 +891,6 @@
           await updateSongTextOnServer(currentEditSongName, newText, currentUser, currentPin);
           alert('Текст песни обновлён');
           closeModal(document.getElementById('edit-song-modal'));
-          // Обновляем список песен в окне добавления
           await showSongsModal();
         } catch (e) {
           error.textContent = 'Ошибка сохранения: ' + e.message;
@@ -908,8 +940,10 @@
           showGlobalLoader();
           const entry = repertoireData[currentRepertoireDate];
           const currentSongs = entry ? entry.songs || [] : [];
-          const newSongs = [...currentSongs, { name: songName, text: '' }];
-          await setRepertoireSongs(currentRepertoireDate, newSongs.map(s => s.name), currentUser, currentPin);
+          // Извлекаем имена из объектов
+          const currentSongNames = currentSongs.map(s => typeof s === 'string' ? s : s.name);
+          const newSongs = [...currentSongNames, songName];
+          await setRepertoireSongs(currentRepertoireDate, newSongs, currentUser, currentPin);
           await refreshRepertoire();
           document.getElementById('add-repertoire-song-modal').style.display = 'none';
           alert('Песня добавлена');
@@ -926,10 +960,16 @@
 
       // ---------- Обновление репертуара ----------
       async function refreshRepertoire() {
-        const resp = await fetch(API_URL);
+        const resp = await fetch(API_URL + '/repertoire');
         const data = await resp.json();
         if (data.error) throw new Error(data.error);
-        repertoireData = data.repertoire || {};
+        Object.keys(data).forEach(dateStr => {
+          const entry = data[dateStr];
+          if (Array.isArray(entry.songs) && entry.songs.length > 0 && typeof entry.songs[0] === 'string') {
+            entry.songs = entry.songs.map(name => ({ name, text: '' }));
+          }
+        });
+        repertoireData = data;
         renderRepertoire();
       }
 
@@ -942,12 +982,11 @@
 
         showGlobalLoader();
         try {
-          const resp = await fetch(API_URL);
-          if (!resp.ok) throw new Error('Ошибка загрузки');
+          // Загрузка матрицы дежурств
+          const resp = await fetch(API_URL + '/duty/matrix');
+          if (!resp.ok) throw new Error('Ошибка загрузки графика');
           const data = await resp.json();
-          if (data.error) throw new Error(data.error);
-
-          const { dates, names, matrix, repertoire } = data;
+          const { dates, names, matrix } = data;
           if (!dates || !names || !matrix) throw new Error('Некорректные данные');
 
           allDates = dates.map((dateStr, i) => ({
@@ -955,13 +994,23 @@
             names: names,
             matrixRow: matrix[i] || []
           }));
-          repertoireData = repertoire || {};
+
+          // Загрузка репертуара
+          const repResp = await fetch(API_URL + '/repertoire');
+          if (!repResp.ok) throw new Error('Ошибка загрузки репертуара');
+          const repData = await repResp.json();
+          Object.keys(repData).forEach(dateStr => {
+            const entry = repData[dateStr];
+            if (Array.isArray(entry.songs) && entry.songs.length > 0 && typeof entry.songs[0] === 'string') {
+              entry.songs = entry.songs.map(name => ({ name, text: '' }));
+            }
+          });
+          repertoireData = repData;
 
           await autoLogin();
 
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-
           futureDates = [];
           pastDates = [];
 
@@ -998,7 +1047,7 @@
         }
       }
 
-      // ---------- Рендер основной таблицы ----------
+      // ---------- Рендер основной таблицы (без изменений) ----------
       function renderMainTable() {
         const container = document.getElementById('main-table-container');
         const paginationEl = document.getElementById('main-pagination');
@@ -1043,7 +1092,7 @@
         container.innerHTML = buildTableHTML(pastDates, true);
       }
 
-      // ---------- Построение HTML таблицы ----------
+      // ---------- Построение HTML таблицы (без изменений) ----------
       function buildTableHTML(items, isArchive) {
         if (!items || items.length === 0) return '';
         const names = items[0].names;
@@ -1168,7 +1217,7 @@
         });
       }
 
-      // ---------- Обработчик клика по ячейке ----------
+      // ---------- Обработчик клика по ячейке (новый эндпоинт) ----------
       async function toggleCell(event) {
         const cell = event.currentTarget;
         if (cell.classList.contains('disabled') || cell.classList.contains('archive-cell')) return;
@@ -1198,20 +1247,22 @@
 
         showGlobalLoader();
         try {
-          const params = new URLSearchParams();
-          params.append('date', date);
-          params.append('name', name);
-          params.append('value', String(newValue));
-          params.append('changer', currentUser);
-          params.append('pin', currentPin);
-          params.append('isAdmin', String(isAdmin));
-          await fetch(API_URL, {
+          const payload = {
+            date_str: date,
+            user_name: name,
+            value: newValue,
+            changer: currentUser,
+            pin: currentPin
+          };
+          const resp = await fetch(API_URL + '/duty/toggle', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
           });
+          const result = await resp.json();
+          if (!resp.ok) throw new Error(result.detail || 'Ошибка сохранения');
         } catch (e) {
-          alert('Ошибка сохранения. Попробуйте ещё раз.');
+          alert('Ошибка сохранения: ' + e.message);
           cell.dataset.checked = String(currentChecked);
           cell.textContent = currentChecked ? '✔' : '•';
           currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
@@ -1222,7 +1273,7 @@
         }
       }
 
-      // ---------- Статистика ----------
+      // ---------- Статистика (без изменений) ----------
       function renderStats() {
         const section = document.getElementById('stats-section');
         const container = document.getElementById('stats-container');
@@ -1279,7 +1330,7 @@
         drawPieChart(canvas, names, totals);
       }
 
-      // ---------- Круговая диаграмма ----------
+      // ---------- Круговая диаграмма (без изменений) ----------
       function drawPieChart(canvas, labels, data) {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -1374,38 +1425,32 @@
         return div.firstElementChild;
       }
 
-      // ---------- Репертуар ----------
+      // ---------- Репертуар (без изменений) ----------
       function renderRepertoire() {
         const futureContainer = document.getElementById('repertoire-future-container');
-        const pastContainer = document.getElementById('repertoire-past-container');
         const paginationEl = document.getElementById('repertoire-pagination');
         const futureCount = document.getElementById('repertoire-future-count');
-        const pastCount = document.getElementById('repertoire-past-count');
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const future = [];
-        const past = [];
 
         Object.keys(repertoireData).forEach(dateStr => {
+          const entry = repertoireData[dateStr];
           const d = parseDateDDMMYYYY(dateStr);
           if (!d) {
-            future.push({ dateStr, ...repertoireData[dateStr] });
+            future.push({ dateStr, songs: entry.songs || [], colors: entry.colors || [] });
             return;
           }
           d.setHours(0, 0, 0, 0);
           if (d >= today) {
-            future.push({ dateStr, ...repertoireData[dateStr] });
-          } else {
-            past.push({ dateStr, ...repertoireData[dateStr] });
+            future.push({ dateStr, songs: entry.songs || [], colors: entry.colors || [] });
           }
         });
 
         future.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
-        past.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
 
         repertoireFuture = future;
-        repertoirePast = past;
         repertoireCurrentPage = 0;
 
         futureCount.textContent = `(${future.length})`;
@@ -1467,15 +1512,14 @@
           document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
             btn.removeEventListener('click', deleteRepertoireSongHandler);
             btn.addEventListener('click', deleteRepertoireSongHandler);
-
-            document.querySelectorAll('.move-song-up-btn').forEach(btn => {
-              btn.removeEventListener('click', moveSongUpHandler);
-              btn.addEventListener('click', moveSongUpHandler);
-            });
-            document.querySelectorAll('.move-song-down-btn').forEach(btn => {
-              btn.removeEventListener('click', moveSongDownHandler);
-              btn.addEventListener('click', moveSongDownHandler);
-            });
+          });
+          document.querySelectorAll('.move-song-up-btn').forEach(btn => {
+            btn.removeEventListener('click', moveSongUpHandler);
+            btn.addEventListener('click', moveSongUpHandler);
+          });
+          document.querySelectorAll('.move-song-down-btn').forEach(btn => {
+            btn.removeEventListener('click', moveSongDownHandler);
+            btn.addEventListener('click', moveSongDownHandler);
           });
         }
       }
@@ -1492,6 +1536,7 @@
         }
       }
 
+      // ---- Новые обработчики для репертуара (используют новые эндпоинты) ----
       async function deleteRepertoireSongHandler(e) {
         const date = this.dataset.date;
         const songName = this.dataset.song;
@@ -1501,8 +1546,9 @@
           const entry = repertoireData[date];
           if (!entry) throw new Error('Дата не найдена');
           const currentSongs = entry.songs || [];
-          const newSongs = currentSongs.filter(s => s.name !== songName);
-          await setRepertoireSongs(date, newSongs.map(s => s.name), currentUser, currentPin);
+          const currentSongNames = currentSongs.map(s => typeof s === 'string' ? s : s.name);
+          const newSongs = currentSongNames.filter(name => name !== songName);
+          await setRepertoireSongs(date, newSongs, currentUser, currentPin);
           await refreshRepertoire();
           alert('Песня удалена из репертуара');
         } catch (e) {
@@ -1518,12 +1564,14 @@
         const entry = repertoireData[date];
         if (!entry) return;
         const songs = entry.songs || [];
-        const index = songs.findIndex(s => s.name === songName);
+        const songNames = songs.map(s => typeof s === 'string' ? s : s.name);
+        const index = songNames.indexOf(songName);
         if (index <= 0) return;
-        [songs[index], songs[index - 1]] = [songs[index - 1], songs[index]];
+        const newSongNames = [...songNames];
+        [newSongNames[index], newSongNames[index - 1]] = [newSongNames[index - 1], newSongNames[index]];
         try {
           showGlobalLoader();
-          await setRepertoireSongs(date, songs.map(s => s.name), currentUser, currentPin);
+          await setRepertoireSongs(date, newSongNames, currentUser, currentPin);
           await refreshRepertoire();
         } catch (e) {
           alert('Ошибка изменения порядка: ' + e.message);
@@ -1538,12 +1586,14 @@
         const entry = repertoireData[date];
         if (!entry) return;
         const songs = entry.songs || [];
-        const index = songs.findIndex(s => s.name === songName);
-        if (index === -1 || index >= songs.length - 1) return;
-        [songs[index], songs[index + 1]] = [songs[index + 1], songs[index]];
+        const songNames = songs.map(s => typeof s === 'string' ? s : s.name);
+        const index = songNames.indexOf(songName);
+        if (index === -1 || index >= songNames.length - 1) return;
+        const newSongNames = [...songNames];
+        [newSongNames[index], newSongNames[index + 1]] = [newSongNames[index + 1], newSongNames[index]];
         try {
           showGlobalLoader();
-          await setRepertoireSongs(date, songs.map(s => s.name), currentUser, currentPin);
+          await setRepertoireSongs(date, newSongNames, currentUser, currentPin);
           await refreshRepertoire();
         } catch (e) {
           alert('Ошибка изменения порядка: ' + e.message);
@@ -1552,6 +1602,7 @@
         }
       }
 
+      // ---------- Построение HTML репертуара (без изменений) ----------
       function buildRepertoireTableHTML(items, isArchive = false) {
         if (!items || items.length === 0) return '';
         let html = '<div class="repertoire-grid">';
@@ -1571,18 +1622,18 @@
                 <div class="repertoire-songs">
                   <div class="repertoire-section-title">🎵 Песни</div>
                   ${songs.length ? songs.map(song => `
-                    <div class="repertoire-song-item">
-                      <span class="song-name">• ${song.name}</span>
-                      <div class="song-actions">
-                        ${song.text ? `<button class="copy-song-text-btn" data-text="${song.text.replace(/"/g, '&quot;')}" title="Копировать текст">📋</button>` : ''}
-                        ${!isArchive && isAdmin ? `
-                          <button class="move-song-up-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вверх">↑</button>
-                          <button class="move-song-down-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вниз">↓</button>
-                          <button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>
-                        ` : ''}
-                      </div>
+                  <div class="repertoire-song-item">
+                    <span class="song-name">• ${song.name}</span>
+                    <div class="song-actions">
+                      ${song.text ? `<button class="copy-song-text-btn" data-text="${song.text.replace(/"/g, '&quot;')}" title="Копировать текст">📋</button>` : ''}
+                      ${!isArchive && isAdmin ? `
+                        <button class="move-song-up-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вверх">↑</button>
+                        <button class="move-song-down-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вниз">↓</button>
+                        <button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>
+                      ` : ''}
                     </div>
-                  `).join('') : '<div class="repertoire-empty">—</div>'}
+                  </div>
+                `).join('') : '<div class="repertoire-empty">—</div>'}
                 </div>
                 <div class="repertoire-colors">
                   <div class="repertoire-section-title">🎨 Цвета</div>

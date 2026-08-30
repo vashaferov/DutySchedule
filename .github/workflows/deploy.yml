@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
@@ -22,11 +22,42 @@ jobs:
           script_stop: true
           script: |
             set -e
-            cd /var/DutySchedule
-            git config --global --add safe.directory /var/DutySchedule
-            git pull
-            if docker ps -a --format '{{.Names}}' | grep -q "^DutySchedule$"; then
-              docker restart DutySchedule
+            echo "🚀 Starting deployment..."
+
+            # Переходим в папку проекта
+            mkdir -p /var/duty
+            cd /var/duty
+
+            # Клонируем или обновляем код
+            if [ -d .git ]; then
+              git pull
             else
-              docker run -d --name DutySchedule -p 80:80 -v $(pwd):/usr/share/nginx/html:ro nginx:alpine
+              git clone https://github.com/${{ github.repository }} .
             fi
+
+            # Создаём .env с секретами
+            cat > /var/duty/.env << EOF
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            SPREADSHEET_ID=${{ secrets.SPREADSHEET_ID }}
+            GOOGLE_SHEETS_CREDENTIALS=${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
+            DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5433/${{ secrets.DB_NAME }}
+            EOF
+
+            # Пересобираем и перезапускаем контейнеры
+            docker compose pull
+            docker compose up -d --force-recreate --build
+
+            # Миграция только при первом деплое
+            if [ ! -f /var/duty/.migrated ]; then
+                echo "🔄 Запускаем миграцию данных..."
+                docker compose run --rm migrate
+                touch /var/duty/.migrated
+                echo "✅ Миграция завершена"
+            else
+                echo "⏭️ Миграция уже выполнена, пропускаем."
+            fi
+
+            echo "✅ Deployment completed successfully."

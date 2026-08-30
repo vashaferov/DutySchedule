@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY migrate_data.py .
+COPY requirements_migrate.txt .
+
+RUN pip install --no-cache-dir -r requirements_migrate.txt
+
+CMD ["python", "migrate_data.py"]
