@@ -26,26 +26,21 @@ jobs:
             echo "Current user: $(whoami)"
             echo "Home: $HOME"
 
-            # Проверяем git
             git --version || { echo "❌ Git not installed!"; exit 1; }
 
             DOCKER_COMPOSE="docker-compose"
 
-            # Создаём папку проекта
             mkdir -p ~/duty
             cd ~/duty
 
             # Клонируем или обновляем код
-            if [ -d .git ]; then
+            if git rev-parse --git-dir >/dev/null 2>&1; then
                 echo "Pulling latest changes..."
                 git pull
             else
                 echo "Cloning repository..."
-                # Если папка не пуста, но .git нет, удаляем содержимое
-                if [ "$(ls -A)" ]; then
-                    echo "Directory not empty and not a git repo, cleaning..."
-                    rm -rf ./*
-                fi
+                # Если папка не пуста, очищаем её
+                rm -rf ./* 2>/dev/null || true
                 git clone https://github.com/${{ github.repository }} .
             fi
 
@@ -68,7 +63,6 @@ jobs:
             DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/${{ secrets.DB_NAME }}
             EOF
 
-            # Пересобираем и перезапускаем контейнеры
             echo "Pulling images..."
             $DOCKER_COMPOSE pull
 
