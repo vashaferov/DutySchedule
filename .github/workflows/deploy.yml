@@ -33,19 +33,17 @@ jobs:
             mkdir -p ~/duty
             cd ~/duty
 
-            # Клонируем или обновляем код (с обработкой ошибки)
+            # Клонируем или обновляем код (с обработкой ошибки Drone)
+            set +e
             if [ -d .git ]; then
                 echo "Pulling latest changes..."
                 git pull
             else
                 echo "Cloning repository..."
-                rm -rf ./* 2>/dev/null || true
-                git clone https://github.com/${{ github.repository }} . || true
-                if [ ! -d .git ]; then
-                    echo "❌ Git clone failed!"
-                    exit 1
-                fi
+                rm -rf ./* 2>/dev/null
+                git clone https://github.com/${{ github.repository }} .
             fi
+            set -e
 
             # Проверяем наличие docker-compose.yml
             if [ ! -f docker-compose.yml ]; then
