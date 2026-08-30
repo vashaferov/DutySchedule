@@ -24,9 +24,9 @@ jobs:
             set -e
             echo "🚀 Starting deployment..."
 
-            # Переходим в папку проекта
-            mkdir -p /var/duty
-            cd /var/duty
+            # Переходим в папку проекта в домашней директории
+            mkdir -p ~/duty
+            cd ~/duty
 
             # Клонируем или обновляем код
             if [ -d .git ]; then
@@ -36,14 +36,14 @@ jobs:
             fi
 
             # Создаём .env с секретами
-            cat > /var/duty/.env << EOF
+            cat > ~/duty/.env << EOF
             DB_NAME=${{ secrets.DB_NAME }}
             DB_USER=${{ secrets.DB_USER }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             SPREADSHEET_ID=${{ secrets.SPREADSHEET_ID }}
             GOOGLE_SHEETS_CREDENTIALS=${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
-            DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5433/${{ secrets.DB_NAME }}
+            DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/${{ secrets.DB_NAME }}
             EOF
 
             # Пересобираем и перезапускаем контейнеры
@@ -51,10 +51,10 @@ jobs:
             docker compose up -d --force-recreate --build
 
             # Миграция только при первом деплое
-            if [ ! -f /var/duty/.migrated ]; then
+            if [ ! -f ~/duty/.migrated ]; then
                 echo "🔄 Запускаем миграцию данных..."
                 docker compose run --rm migrate
-                touch /var/duty/.migrated
+                touch ~/duty/.migrated
                 echo "✅ Миграция завершена"
             else
                 echo "⏭️ Миграция уже выполнена, пропускаем."
