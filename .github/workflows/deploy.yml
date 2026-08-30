@@ -33,8 +33,9 @@ jobs:
             mkdir -p ~/duty
             cd ~/duty
 
+            set +e
             # Клонируем или обновляем код
-            if git rev-parse --git-dir >/dev/null 2>&1; then
+            if [ -d .git ]; then
                 echo "Pulling latest changes..."
                 git pull
             else
@@ -43,6 +44,7 @@ jobs:
                 rm -rf ./* 2>/dev/null || true
                 git clone https://github.com/${{ github.repository }} .
             fi
+            set -e
 
             # Проверяем наличие docker-compose.yml
             if [ ! -f docker-compose.yml ]; then
