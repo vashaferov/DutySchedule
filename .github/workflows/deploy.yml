@@ -77,6 +77,8 @@ jobs:
             echo "Starting containers..."
             $DOCKER_COMPOSE up -d --force-recreate --build
 
+            # Миграция с защитой от Drone
+            set +e
             if [ ! -f ~/duty/.migrated ]; then
                 echo "🔄 Запускаем миграцию данных..."
                 $DOCKER_COMPOSE run --rm migrate || echo "⚠️ Migration failed, but continuing..."
@@ -85,5 +87,6 @@ jobs:
             else
                 echo "⏭️ Миграция уже выполнена, пропускаем."
             fi
+            set -e
 
             echo "✅ Deployment completed successfully."
