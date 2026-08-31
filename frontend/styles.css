@@ -1274,3 +1274,223 @@ tbody tr:has(.cell.selected) td:first-child {
 .move-song-down-btn:hover {
   background: var(--bg-cell-hover);
 }
+
+.admin-user-chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: var(--bg-cell);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.admin-user-chip:hover {
+  background: var(--bg-cell-hover);
+}
+
+/* ---------- Стили для переключателя роли ---------- */
+.role-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+/* ---------- Админ-панель: выравнивание элементов ---------- */
+#admin-selected-user .modal-input {
+  max-width: 200px;
+}
+
+#admin-selected-user .btn-primary,
+#admin-selected-user .btn-secondary {
+  white-space: nowrap;
+}
+
+.role-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.role-toggle-wrapper input[type="checkbox"] {
+  display: none;
+}
+
+.role-toggle-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: var(--bg-cell);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  transition: background 0.3s, border-color 0.3s;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.role-toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.role-toggle-wrapper input:checked + .role-toggle-track {
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.role-toggle-wrapper input:checked + .role-toggle-track::after {
+  transform: translateX(20px);
+  background: #fff;
+}
+
+.role-toggle-wrapper .role-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.role-toggle-wrapper .role-label.active {
+  color: #4f46e5;
+}
+
+#admin-change-role-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#admin-change-role-btn:hover {
+  background: #4338ca;
+}
+
+/* ---------- Toast-уведомления ---------- */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  width: 100%;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  border-left: 4px solid #4f46e5;
+  animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border-color);
+}
+
+.toast-success {
+  border-left-color: #22c55e;
+}
+.toast-success .toast-icon {
+  color: #22c55e;
+}
+
+.toast-error {
+  border-left-color: #ef4444;
+}
+.toast-error .toast-icon {
+  color: #ef4444;
+}
+
+.toast-warning {
+  border-left-color: #eab308;
+}
+.toast-warning .toast-icon {
+  color: #eab308;
+}
+
+.toast-info {
+  border-left-color: #3b82f6;
+}
+.toast-info .toast-icon {
+  color: #3b82f6;
+}
+
+.toast-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+  word-break: break-word;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+.toast-close:hover {
+  color: var(--text-primary);
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 480px) {
+  #toast-container {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: 100%;
+  }
+  .toast {
+    font-size: 0.85rem;
+    padding: 12px 14px;
+  }
+}

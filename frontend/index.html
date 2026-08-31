@@ -9,6 +9,8 @@
 </head>
 
 <body>
+  <!-- Система уведомлений (toast) -->
+  <div id="toast-container"></div>
   <!-- Глобальный индикатор загрузки -->
   <div id="global-loader"
     style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
@@ -136,11 +138,57 @@
           <button class="modal-close-btn" id="admin-modal-close">✕</button>
         </div>
         <div class="modal-body">
-          <div id="admin-user-list"></div>
-          <div id="admin-modal-error" class="modal-error"></div>
-          <button id="sync-btn"
-            style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#f59e0b; color:#fff; cursor:pointer; font-size:0.9rem;">🔄
-            Запустить синхронизацию</button>
+          <!-- Поиск -->
+          <div style="margin-bottom:16px;">
+            <input type="text" id="admin-search-input" placeholder="Поиск пользователя..." class="modal-input">
+            <div id="admin-search-results" style="margin-top:4px;"></div>
+          </div>
+
+          <!-- Выбранный пользователь -->
+          <div id="admin-selected-user"
+            style="display:none; border-top:1px solid var(--border-color); padding-top:16px; margin-top:12px;">
+            <p><strong>Пользователь:</strong> <span id="admin-selected-name"></span></p>
+
+            <!-- Строка 1: Смена PIN и Удаление -->
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+              <input type="text" id="admin-new-pin" placeholder="Новый PIN" class="modal-input"
+                style="width:auto; flex:1; min-width:120px; max-width:200px;">
+              <button id="admin-change-pin-btn" class="btn-primary" style="padding:6px 14px;">Сменить PIN</button>
+              <button id="admin-delete-user-btn" class="btn-secondary"
+                style="padding:6px 14px; background:#ef4444; color:#fff;">Удалить</button>
+            </div>
+
+            <!-- Строка 2: Роль и кнопка обновления -->
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:12px;">
+              <div class="role-toggle-wrapper">
+                <input type="checkbox" id="admin-role-checkbox">
+                <label for="admin-role-checkbox" class="role-toggle-track"></label>
+                <span class="role-label" id="admin-role-label">👤 Пользователь</span>
+              </div>
+              <button id="admin-change-role-btn" class="btn-primary" style="padding:6px 14px;">Обновить роль</button>
+            </div>
+
+            <div id="admin-user-message" class="modal-error" style="margin-top:8px;"></div>
+          </div>
+
+          <!-- Создание пользователя -->
+          <div style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
+            <h4>➕ Создать пользователя</h4>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+              <input type="text" id="admin-create-name" placeholder="Имя" class="modal-input"
+                style="width:auto; flex:1; min-width:120px;">
+              <input type="text" id="admin-create-pin" placeholder="PIN" class="modal-input"
+                style="width:auto; flex:1; min-width:80px;">
+              <button id="admin-create-user-btn" class="btn-primary" style="padding:6px 14px;">Создать</button>
+            </div>
+            <div id="admin-create-error" class="modal-error"></div>
+          </div>
+
+          <!-- Кнопка синхронизации -->
+          <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+            <button id="admin-sync-btn" class="btn-primary" style="background:#f59e0b; color:#fff;">🔄 Запустить
+              синхронизацию</button>
+          </div>
         </div>
       </div>
     </div>
@@ -249,6 +297,37 @@
       let filteredSongs = [];
       let currentEditSongName = '';
 
+      // ---------- Toast-уведомления ----------
+      function showNotification(message, type = 'info', duration = 3000) {
+        const container = document.getElementById('toast-container');
+        const icons = {
+          success: '✅',
+          error: '❌',
+          warning: '⚠️',
+          info: 'ℹ️'
+        };
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+    <span class="toast-message">${message}</span>
+    <button class="toast-close">&times;</button>
+  `;
+
+        // Закрытие по кнопке
+        toast.querySelector('.toast-close').addEventListener('click', () => {
+          toast.remove();
+        });
+
+        container.appendChild(toast);
+
+        // Автоматическое удаление через duration
+        setTimeout(() => {
+          if (toast.parentNode) toast.remove();
+        }, duration);
+      }
+
       // ---------- Глобальный индикатор загрузки ----------
       let loaderTimeout = null;
 
@@ -258,7 +337,7 @@
         if (loaderTimeout) clearTimeout(loaderTimeout);
         loaderTimeout = setTimeout(() => {
           hideGlobalLoader();
-          alert('Превышено время ожидания ответа от сервера. Попробуйте ещё раз.');
+          showNotification('Превышено время ожидания ответа от сервера. Попробуйте ещё раз.', 'warning');
         }, 10000);
       }
 
@@ -338,7 +417,7 @@
         const resp = await fetch(API_URL + '/auth/getUserNames');
         const data = await resp.json();
         if (data.error) {
-          console.error('Ошибка загрузки пользователей:', data.error);
+          showNotification('Не удалось загрузить список пользователей. Проверьте соединение.', 'error')
           return [];
         }
         return data.names || [];
@@ -360,12 +439,6 @@
         const userDisplay = document.getElementById('user-display');
         const logoutBtn = document.getElementById('logout-btn');
         const adminBtn = document.getElementById('admin-panel-btn');
-        const syncBtn = document.getElementById('sync-btn');
-        if (currentUser && isAdmin) {
-          syncBtn.style.display = 'inline-block';
-        } else {
-          syncBtn.style.display = 'none';
-        }
 
         if (currentUser) {
           loginBtn.style.display = 'none';
@@ -451,7 +524,7 @@
           namesList = await loadUsers();
         } catch (e) {
           console.error('Ошибка загрузки пользователей:', e);
-          alert('Не удалось загрузить список пользователей. Проверьте соединение.');
+          showNotification('Не удалось загрузить список пользователей. Проверьте соединение.', 'error');
           hideGlobalLoader();
           return;
         } finally {
@@ -510,7 +583,7 @@
           } catch (e) {
             error.textContent = 'Ошибка проверки PIN';
             error.style.display = 'block';
-            console.error(e);
+            showNotification(e.message, 'error');
           } finally {
             hideGlobalLoader();
             confirmBtn.textContent = originalText;
@@ -534,91 +607,206 @@
       document.getElementById('logout-btn').addEventListener('click', logoutUser);
 
       // ---------- Управление пользователями (админ) ----------
+      let allUsers = [];
+      let selectedAdminUser = null;
+
       document.getElementById('admin-panel-btn').addEventListener('click', async function () {
         if (!isAdmin) return;
         showGlobalLoader();
-        let userList = [];
         try {
-          userList = await loadUsersForAdmin(currentUser, currentPin);
+          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          allUsers = userList;
+          selectedAdminUser = null;
+          renderAdminSearchResults('');
+          document.getElementById('admin-selected-user').style.display = 'none';
+          document.getElementById('admin-modal').style.display = 'flex';
         } catch (e) {
-          alert('Ошибка загрузки пользователей: ' + e.message);
-          hideGlobalLoader();
-          return;
+          showNotification('Ошибка загрузки пользователей: ' + e.message, 'error');
         } finally {
           hideGlobalLoader();
         }
-
-        const modal = document.getElementById('admin-modal');
-        const container = document.getElementById('admin-user-list');
-        const error = document.getElementById('admin-modal-error');
-        error.style.display = 'none';
-        let html = '<table style="width:100%; border-collapse:collapse;">';
-        html += '<tr><th style="text-align:left; padding:8px;">Имя</th><th style="text-align:left; padding:8px;">Новый PIN</th><th style="text-align:left; padding:8px;">Действие</th></tr>';
-        userList.forEach(u => {
-          html += `
-          <tr>
-            <td style="padding:8px;">${u.name}</td>
-            <td style="padding:8px;"><input type="text" class="admin-pin-input" data-name="${u.name}" placeholder="Введите новый PIN" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-body); color:var(--text-primary);"></td>
-            <td style="padding:8px;"><button class="admin-save-pin" data-name="${u.name}" style="padding:6px 14px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;">Сохранить</button></td>
-          </tr>
-          `;
-        });
-        html += '</table>';
-        container.innerHTML = html;
-        modal.style.display = 'flex';
-
-        container.querySelectorAll('.admin-save-pin').forEach(btn => {
-          btn.addEventListener('click', async function () {
-            const name = this.dataset.name;
-            const input = document.querySelector(`.admin-pin-input[data-name="${name}"]`);
-            const newPin = input.value.trim();
-            if (!newPin) {
-              error.textContent = 'PIN не может быть пустым';
-              error.style.display = 'block';
-              return;
-            }
-            error.style.display = 'none';
-            const originalText = this.textContent;
-            this.textContent = '⏳ Сохранение...';
-            this.disabled = true;
-            showGlobalLoader();
-            try {
-              const resp = await fetch(`${API_URL}/users/${encodeURIComponent(name)}/pin?new_pin=${encodeURIComponent(newPin)}&admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`, {
-                method: 'PUT'
-              });
-              const result = await resp.json();
-              if (result.error) {
-                error.textContent = result.error;
-                error.style.display = 'block';
-              } else {
-                alert('PIN для ' + name + ' успешно обновлён!');
-                document.getElementById('admin-modal-close').click();
-                document.getElementById('admin-panel-btn').click();
-              }
-            } catch (e) {
-              error.textContent = 'Ошибка сохранения: ' + e.message;
-              error.style.display = 'block';
-              console.error(e);
-            } finally {
-              hideGlobalLoader();
-              this.textContent = originalText;
-              this.disabled = false;
-            }
-          });
-        });
-
-        document.getElementById('admin-modal-close').onclick = function () {
-          modal.style.display = 'none';
-        };
-        modal.addEventListener('click', function (e) {
-          if (e.target === this) modal.style.display = 'none';
-        });
       });
 
-      document.getElementById('manage-songs-btn').addEventListener('click', showSongsModal);
+      function renderAdminSearchResults(query) {
+        const container = document.getElementById('admin-search-results');
+        const filtered = allUsers.filter(u => u.name.toLowerCase().includes(query.toLowerCase()));
+        if (filtered.length === 0) {
+          container.innerHTML = '<p style="color:var(--text-muted); margin-top:4px;">Пользователи не найдены</p>';
+          return;
+        }
+        let html = '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">';
+        filtered.forEach(u => {
+          html += `<span class="admin-user-chip" data-name="${u.name}" style="padding:4px 12px; border-radius:16px; background:var(--bg-cell); cursor:pointer; border:1px solid var(--border-color);">${u.name}</span>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        container.querySelectorAll('.admin-user-chip').forEach(el => {
+          el.addEventListener('click', function () {
+            const name = this.dataset.name;
+            selectAdminUser(name);
+          });
+        });
+      }
 
-      document.getElementById('sync-btn').addEventListener('click', async function () {
-        if (!currentUser || !isAdmin) return;
+      function selectAdminUser(name) {
+        const user = allUsers.find(u => u.name === name);
+        if (!user) return;
+        selectedAdminUser = user;
+        document.getElementById('admin-selected-name').textContent = user.name;
+        document.getElementById('admin-selected-user').style.display = 'block';
+        document.getElementById('admin-new-pin').value = '';
+        document.getElementById('admin-user-message').style.display = 'none';
+        const isAdmin = (user.role === 'admin');
+        document.getElementById('admin-role-checkbox').checked = isAdmin;
+        document.getElementById('admin-role-label').textContent = isAdmin ? '👑 Администратор' : '👤 Пользователь';;
+      }
+
+      // Обработчик поиска
+      document.getElementById('admin-search-input').addEventListener('input', function () {
+        renderAdminSearchResults(this.value);
+      });
+
+      // Смена PIN
+      document.getElementById('admin-change-pin-btn').addEventListener('click', async function () {
+        if (!selectedAdminUser) return;
+        const newPin = document.getElementById('admin-new-pin').value.trim();
+        if (!newPin) {
+          document.getElementById('admin-user-message').textContent = 'Введите новый PIN';
+          document.getElementById('admin-user-message').style.display = 'block';
+          return;
+        }
+        try {
+          showGlobalLoader();
+          const resp = await fetch(`${API_URL}/users/${encodeURIComponent(selectedAdminUser.name)}/pin?new_pin=${encodeURIComponent(newPin)}&admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`, {
+            method: 'PUT'
+          });
+          const result = await resp.json();
+          if (!resp.ok) throw new Error(result.detail || 'Ошибка');
+          showNotification('PIN успешно обновлён', 'success');
+          document.getElementById('admin-user-message').style.display = 'none';
+          // Обновим список пользователей (перезагрузим)
+          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          allUsers = userList;
+          renderAdminSearchResults(document.getElementById('admin-search-input').value);
+          // Если выбранный пользователь обновился, обновим отображение
+          const updated = allUsers.find(u => u.name === selectedAdminUser.name);
+          if (updated) {
+            selectedAdminUser = updated;
+            document.getElementById('admin-selected-name').textContent = updated.name;
+          }
+        } catch (e) {
+          document.getElementById('admin-user-message').textContent = e.message;
+          document.getElementById('admin-user-message').style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
+      // Смена роли
+      document.getElementById('admin-change-role-btn').addEventListener('click', async function () {
+        if (!selectedAdminUser) return;
+        const newRole = document.getElementById('admin-role-checkbox').checked ? 'admin' : 'user';
+        try {
+          showGlobalLoader();
+          const resp = await fetch(`${API_URL}/users/${encodeURIComponent(selectedAdminUser.name)}/role?role=${newRole}&admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`, {
+            method: 'PUT'
+          });
+          const result = await resp.json();
+          if (!resp.ok) throw new Error(result.detail || 'Ошибка');
+          showNotification('Роль успешно обновлена', 'success');
+          // Обновим список пользователей
+          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          allUsers = userList;
+          renderAdminSearchResults(document.getElementById('admin-search-input').value);
+          const updated = allUsers.find(u => u.name === selectedAdminUser.name);
+          if (updated) {
+            selectedAdminUser = updated;
+            document.getElementById('admin-selected-name').textContent = updated.name;
+            document.getElementById('admin-role-checkbox').checked = (updated.role === 'admin');
+          }
+        } catch (e) {
+          document.getElementById('admin-user-message').textContent = e.message;
+          document.getElementById('admin-user-message').style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
+      document.getElementById('admin-role-checkbox').addEventListener('change', function () {
+        const label = document.getElementById('admin-role-label');
+        if (this.checked) {
+          label.textContent = '👑 Администратор';
+        } else {
+          label.textContent = '👤 Пользователь';
+        }
+      });
+
+      // Удаление пользователя
+      document.getElementById('admin-delete-user-btn').addEventListener('click', async function () {
+        if (!selectedAdminUser) return;
+        if (!confirm(`Удалить пользователя "${selectedAdminUser.name}"?`)) return;
+        try {
+          showGlobalLoader();
+          const resp = await fetch(`${API_URL}/users/${encodeURIComponent(selectedAdminUser.name)}?admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`, {
+            method: 'DELETE'
+          });
+          const result = await resp.json();
+          if (!resp.ok) throw new Error(result.detail || 'Ошибка');
+          showNotification('Пользователь удалён', 'success');
+          // Обновим список
+          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          allUsers = userList;
+          selectedAdminUser = null;
+          document.getElementById('admin-selected-user').style.display = 'none';
+          renderAdminSearchResults(document.getElementById('admin-search-input').value);
+        } catch (e) {
+          document.getElementById('admin-user-message').textContent = e.message;
+          document.getElementById('admin-user-message').style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
+      // Создание пользователя
+      document.getElementById('admin-create-user-btn').addEventListener('click', async function () {
+        const name = document.getElementById('admin-create-name').value.trim();
+        const pin = document.getElementById('admin-create-pin').value.trim();
+        if (!name || !pin) {
+          document.getElementById('admin-create-error').textContent = 'Введите имя и PIN';
+          document.getElementById('admin-create-error').style.display = 'block';
+          return;
+        }
+        try {
+          showGlobalLoader();
+          const params = new URLSearchParams();
+          params.append('name', name);
+          params.append('pin', pin);
+          params.append('admin_name', currentUser);
+          params.append('admin_pin', currentPin);
+          const resp = await fetch(`${API_URL}/users?${params.toString()}`, {
+            method: 'POST'
+          });
+          const result = await resp.json();
+          if (!resp.ok) throw new Error(result.detail || 'Ошибка');
+          showNotification('Пользователь создан', 'success');
+          document.getElementById('admin-create-name').value = '';
+          document.getElementById('admin-create-pin').value = '';
+          document.getElementById('admin-create-error').style.display = 'none';
+          // Обновим список
+          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          allUsers = userList;
+          renderAdminSearchResults(document.getElementById('admin-search-input').value);
+        } catch (e) {
+          document.getElementById('admin-create-error').textContent = e.message;
+          document.getElementById('admin-create-error').style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
+      // Кнопка синхронизации в панели
+      document.getElementById('admin-sync-btn').addEventListener('click', async function () {
+        if (!isAdmin) return;
         try {
           showGlobalLoader();
           const resp = await fetch(`${API_URL}/sync/run?changer=${encodeURIComponent(currentUser)}&pin=${encodeURIComponent(currentPin)}`, {
@@ -626,13 +814,15 @@
           });
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.detail || 'Ошибка');
-          alert('Синхронизация запущена успешно!');
+          showNotification('Синхронизация запущена успешно!', 'success');
         } catch (e) {
-          alert('Ошибка: ' + e.message);
+          showNotification('Ошибка: ' + e.message, 'error');
         } finally {
           hideGlobalLoader();
         }
       });
+
+      document.getElementById('manage-songs-btn').addEventListener('click', showSongsModal);
 
       // ---------- Вкладки ----------
       document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -721,7 +911,7 @@
         try {
           songs = await loadSongs(currentUser, currentPin);
         } catch (e) {
-          alert('Ошибка загрузки песен: ' + e.message);
+          showNotification('Ошибка загрузки песен: ' + e.message, 'error');
           hideGlobalLoader();
           return;
         } finally {
@@ -776,10 +966,10 @@
               try {
                 showGlobalLoader();
                 await deleteSongOnServer(song.name, currentUser, currentPin);
-                alert('Песня удалена');
+                showNotification('Песня удалена', 'success');
                 await showSongsModal();
               } catch (e) {
-                alert('Ошибка: ' + e.message);
+                showNotification('Ошибка: ' + e.message, 'error');
               } finally {
                 hideGlobalLoader();
               }
@@ -844,7 +1034,7 @@
         try {
           showGlobalLoader();
           await addNewSong(name, text, currentUser, currentPin);
-          alert('Песня добавлена');
+          showNotification('Песня добавлена', 'success');
           closeModal(document.getElementById('add-song-modal'));
           await showSongsModal();
         } catch (e) {
@@ -865,7 +1055,7 @@
 
         const song = allSongs.find(s => s.name === songName);
         if (!song) {
-          alert('Песня не найдена');
+          showNotification('Песня не найдена', 'warning');
           return;
         }
         currentEditSongName = songName;
@@ -889,7 +1079,7 @@
         try {
           showGlobalLoader();
           await updateSongTextOnServer(currentEditSongName, newText, currentUser, currentPin);
-          alert('Текст песни обновлён');
+          showNotification('Текст песни обновлён', 'success');
           closeModal(document.getElementById('edit-song-modal'));
           await showSongsModal();
         } catch (e) {
@@ -911,7 +1101,7 @@
           loadSongs(currentUser, currentPin).then(songs => {
             allSongs = songs;
             fillRepertoireSongSelect(select);
-          }).catch(e => alert('Ошибка загрузки песен: ' + e.message));
+          }).catch(e => showNotification('Ошибка загрузки песен: ' + e.message, 'error'));
         } else {
           fillRepertoireSongSelect(select);
         }
@@ -946,9 +1136,9 @@
           await setRepertoireSongs(currentRepertoireDate, newSongs, currentUser, currentPin);
           await refreshRepertoire();
           document.getElementById('add-repertoire-song-modal').style.display = 'none';
-          alert('Песня добавлена');
+          showNotification('Песня добавлена', 'success');
         } catch (e) {
-          alert('Ошибка: ' + e.message);
+          showNotification('Ошибка: ' + e.message, 'error');
         } finally {
           hideGlobalLoader();
         }
@@ -1225,11 +1415,11 @@
         const date = cell.dataset.date;
         const name = cell.dataset.name;
         if (!currentUser) {
-          alert('Пожалуйста, войдите в систему.');
+          showNotification('Пожалуйста, войдите в систему.', 'warning');
           return;
         }
         if (!isAdmin && currentUser !== name) {
-          alert('Вы можете изменять только свои ячейки.');
+          showNotification('Вы можете изменять только свои ячейки.', 'warning');
           return;
         }
 
@@ -1262,7 +1452,7 @@
           const result = await resp.json();
           if (!resp.ok) throw new Error(result.detail || 'Ошибка сохранения');
         } catch (e) {
-          alert('Ошибка сохранения: ' + e.message);
+          showNotification('Ошибка сохранения: ' + e.message, 'error');
           cell.dataset.checked = String(currentChecked);
           cell.textContent = currentChecked ? '✔' : '•';
           currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
@@ -1532,7 +1722,7 @@
           this.textContent = '✅ Скопировано!';
           setTimeout(() => { this.textContent = original; }, 2000);
         } catch (err) {
-          alert('Не удалось скопировать текст');
+          showNotification('Не удалось скопировать текст', 'warning');
         }
       }
 
@@ -1550,9 +1740,9 @@
           const newSongs = currentSongNames.filter(name => name !== songName);
           await setRepertoireSongs(date, newSongs, currentUser, currentPin);
           await refreshRepertoire();
-          alert('Песня удалена из репертуара');
+          showNotification('Песня удалена из репертуара', 'success');
         } catch (e) {
-          alert('Ошибка: ' + e.message);
+          showNotification('Ошибка: ' + e.message, 'error');
         } finally {
           hideGlobalLoader();
         }
@@ -1574,7 +1764,7 @@
           await setRepertoireSongs(date, newSongNames, currentUser, currentPin);
           await refreshRepertoire();
         } catch (e) {
-          alert('Ошибка изменения порядка: ' + e.message);
+          showNotification('Ошибка изменения порядка: ' + e.message, 'error');
         } finally {
           hideGlobalLoader();
         }
@@ -1596,7 +1786,7 @@
           await setRepertoireSongs(date, newSongNames, currentUser, currentPin);
           await refreshRepertoire();
         } catch (e) {
-          alert('Ошибка изменения порядка: ' + e.message);
+          showNotification('Ошибка изменения порядка: ' + e.message, 'error');
         } finally {
           hideGlobalLoader();
         }
@@ -1674,7 +1864,7 @@
             this.textContent = original;
           }, 1500);
         }).catch(() => {
-          alert('Не удалось скопировать текст');
+          showNotification('Не удалось скопировать текст', 'warning');
         });
       }
 

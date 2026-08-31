@@ -121,6 +121,35 @@ def update_user_pin(db: Session, name: str, new_pin: str):
     db.commit()
     return user
 
+def create_user(db: Session, name: str, pin: str, role: str = 'user'):
+    # Проверяем, существует ли пользователь
+    existing = db.query(models.User).filter(models.User.name == name).first()
+    if existing:
+        raise ValueError("User already exists")
+    hashed = pwd_context.hash(pin)
+    user = models.User(name=name, pin_hash=hashed, role=role)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+def delete_user(db: Session, name: str):
+    user = db.query(models.User).filter(models.User.name == name).first()
+    if not user:
+        raise ValueError("User not found")
+    # Также нужно удалить связанные назначения (каскадное удаление в БД есть)
+    db.delete(user)
+    db.commit()
+
+def update_user_role(db: Session, name: str, role: str):
+    user = db.query(models.User).filter(models.User.name == name).first()
+    if not user:
+        raise ValueError("User not found")
+    user.role = role
+    db.commit()
+    db.refresh(user)
+    return user
+
 # ---------- Repertoire (full) ----------
 def get_full_repertoire(db: Session):
     dates = db.query(models.DutyDate).order_by(models.DutyDate.date_str).all()
