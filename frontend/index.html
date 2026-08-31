@@ -32,8 +32,8 @@
             style="display:none; padding:4px 10px; border:none; border-radius:6px; background:var(--bg-cell); cursor:pointer;">Выйти</button>
         </div>
         <button id="admin-panel-btn"
-          style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">👥
-          Управление пользователями</button>
+          style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">Управление
+          👥</button>
         <button id="theme-toggle" class="theme-toggle">🌙</button>
       </div>
     </div>
@@ -888,8 +888,11 @@
       }
 
       async function setRepertoireSongs(date, songItems, changer, pin) {
-        // Преобразуем в массив строк (если пришли объекты, берём name)
-        const songNames = songItems.map(item => typeof item === 'string' ? item : item.name);
+        // Преобразуем в массив строк и убираем дубликаты
+        const songNames = songItems
+          .map(item => typeof item === 'string' ? item : item.name)
+          .filter((name, index, self) => self.indexOf(name) === index);
+
         const resp = await fetch(`${API_URL}/repertoire/${encodeURIComponent(date)}?changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1130,8 +1133,15 @@
           showGlobalLoader();
           const entry = repertoireData[currentRepertoireDate];
           const currentSongs = entry ? entry.songs || [] : [];
-          // Извлекаем имена из объектов
           const currentSongNames = currentSongs.map(s => typeof s === 'string' ? s : s.name);
+
+          // Проверяем, не дублируется ли песня
+          if (currentSongNames.includes(songName)) {
+            showNotification('Эта песня уже есть в репертуаре на эту дату', 'warning');
+            hideGlobalLoader();
+            return;
+          }
+
           const newSongs = [...currentSongNames, songName];
           await setRepertoireSongs(currentRepertoireDate, newSongs, currentUser, currentPin);
           await refreshRepertoire();
