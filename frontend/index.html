@@ -887,7 +887,7 @@
 
       // ---------- Управление песнями (новые эндпоинты) ----------
       async function loadSongs(adminName, adminPin) {
-        const resp = await fetch(API_URL + '/songs');
+        const resp = await fetch(API_URL + '/songs/');
         if (!resp.ok) throw new Error('Ошибка загрузки песен');
         return await resp.json();
       }
@@ -1296,7 +1296,7 @@
           repertoireData = repData;
 
           try {
-              const songsResp = await fetch(API_URL + '/songs');
+              const songsResp = await fetch(API_URL + '/songs/');
               if (songsResp.ok) {
                   allSongs = await songsResp.json();
               }
