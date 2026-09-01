@@ -78,7 +78,7 @@ services:
       - ./certbot-www:/var/www/certbot  
     environment:
       - DOMAINS=mediahlg.ru   # Замените на ваш домен
-      - EMAIL=jonirz55@gmail.com  # Ваш email для уведомлений
+      - CERTBOT_EMAIL=jonirz55@gmail.com  # Ваш email для уведомлений
       - STAGING=false   # false для production сертификатов
     depends_on:
       - api
