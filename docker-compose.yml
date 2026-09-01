@@ -77,9 +77,9 @@ services:
       - ./certbot-var:/var/lib/letsencrypt
       - ./certbot-www:/var/www/certbot  
     environment:
-      - DOMAINS=mediahlg.ru   # Замените на ваш домен
-      - CERTBOT_EMAIL=jonirz55@gmail.com  # Ваш email для уведомлений
-      - STAGING=false   # false для production сертификатов
+      - DOMAINS=mediahlg.ru
+      - CERTBOT_EMAIL=jonirz55@gmail.com
+      - STAGING=false
     depends_on:
       - api
     networks:
