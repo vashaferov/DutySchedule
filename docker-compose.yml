@@ -71,10 +71,11 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:rw
       - ./frontend:/usr/share/nginx/html:ro
       - ./certbot-etc:/etc/letsencrypt
       - ./certbot-var:/var/lib/letsencrypt
+      - ./certbot-www:/var/www/certbot  
     environment:
       - DOMAINS=mediahlg.ru   # Замените на ваш домен
       - EMAIL=jonirz55@gmail.com  # Ваш email для уведомлений
