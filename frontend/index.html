@@ -1248,7 +1248,7 @@
 
       // ---------- Обновление репертуара ----------
       async function refreshRepertoire() {
-        const resp = await fetch(API_URL + '/repertoire');
+        const resp = await fetch(API_URL + '/repertoire/');
         const data = await resp.json();
         if (data.error) throw new Error(data.error);
         Object.keys(data).forEach(dateStr => {
@@ -1284,7 +1284,7 @@
           }));
 
           // Загрузка репертуара
-          const repResp = await fetch(API_URL + '/repertoire');
+          const repResp = await fetch(API_URL + '/repertoire/');
           if (!repResp.ok) throw new Error('Ошибка загрузки репертуара');
           const repData = await repResp.json();
           Object.keys(repData).forEach(dateStr => {
