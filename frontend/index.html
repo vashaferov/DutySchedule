@@ -32,20 +32,10 @@
             style="display:none; padding:4px 10px; border:none; border-radius:6px; background:var(--bg-cell); cursor:pointer;">Выйти</button>
         </div>
         <button id="admin-panel-btn"
-          style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">Управление
+          style="display:none; padding:4px 10px; border-radius:6px; border:none; background:#4f46e5; color:#fff; cursor:pointer; ">Управление
           👥</button>
         <button id="theme-toggle" class="theme-toggle">🌙</button>
       </div>
-    </div>
-
-    <!-- Информация -->
-    <div class="info">
-      <span>ℹ️</span>
-      <span>
-        <strong>Клик</strong> по ячейке — добавить/убрать дежурного.
-        Когда выбрано <strong><span id="max-info">2</span></strong> человека, остальные блокируются.
-        Прошедшие даты перемещены в архив (только просмотр).
-      </span>
     </div>
 
     <!-- Вкладки -->
@@ -263,15 +253,58 @@
           <button class="modal-close-btn" id="add-repertoire-song-close">✕</button>
         </div>
         <div class="modal-body">
-          <p style="color:var(--text-muted); font-size:0.9rem;">Выберите песню из списка</p>
-          <select id="repertoire-song-select" class="modal-select">
-            <option value="">— Выберите —</option>
-          </select>
+          <p style="color:var(--text-muted); font-size:0.9rem;">Введите название песни</p>
+          <input type="text" id="repertoire-song-input" placeholder="Начните вводить название..." class="modal-input"
+            list="repertoire-song-datalist" autocomplete="off">
+          <datalist id="repertoire-song-datalist"></datalist>
           <div id="add-repertoire-song-error" class="modal-error"></div>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary" id="add-repertoire-song-cancel">Отмена</button>
           <button class="btn-primary" id="add-repertoire-song-confirm">Добавить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно просмотра текста песни -->
+    <div id="view-song-text-modal" class="modal-overlay">
+      <div class="modal-content wide" style="max-width:700px;">
+        <div class="modal-header">
+          <h3 id="view-song-title">🎵 Текст песни</h3>
+          <button class="modal-close-btn" id="view-song-modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="margin-bottom:12px;">
+            <strong id="view-song-name-display"></strong>
+          </div>
+          <div id="view-song-text-content"
+            style="white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:12px; background:var(--bg-cell); border-radius:8px; font-family:monospace; font-size:0.95rem; line-height:1.6;">
+          </div>
+          <div id="view-song-text-error" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="view-song-modal-close-btn">Закрыть</button>
+          <button class="btn-primary" id="view-song-copy-btn">📋 Копировать текст</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно выбора дежурного (админ) -->
+    <div id="assign-duty-modal" class="modal-overlay">
+      <div class="modal-content wide">
+        <div class="modal-header">
+          <h3>👥 Выбор дежурного на <span id="assign-duty-date"></span></h3>
+          <button class="modal-close-btn" id="assign-duty-modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="color:var(--text-muted); margin-bottom:12px;">Выберите до <span id="assign-duty-max"></span>
+            дежурных</p>
+          <div id="assign-duty-user-list"></div>
+          <div id="assign-duty-error" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="assign-duty-cancel">Отмена</button>
+          <button class="btn-primary" id="assign-duty-save">💾 Сохранить</button>
         </div>
       </div>
     </div>
@@ -351,8 +384,6 @@
       }
 
       // ---------- Инициализация темы ----------
-      document.getElementById('max-info').textContent = MAX_PER_DAY;
-
       function getSystemTheme() {
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
@@ -468,8 +499,9 @@
         localStorage.setItem('currentUser', name);
         localStorage.setItem('currentUserPin', pin);
         updateAuthUI();
-        updateRowStates('main-table-container');
         renderRepertoire();
+        renderMainCards();
+        renderArchiveTable();
       }
 
       function logoutUser() {
@@ -479,7 +511,8 @@
         localStorage.removeItem('currentUser');
         localStorage.removeItem('currentUserPin');
         updateAuthUI();
-        updateRowStates('main-table-container');
+        renderMainCards();
+        renderArchiveTable();
       }
 
       async function autoLogin() {
@@ -501,8 +534,9 @@
           currentUser = savedUser;
           currentPin = savedPin;
           updateAuthUI();
-          updateRowStates('main-table-container');
           renderRepertoire();
+          renderMainCards();
+          renderArchiveTable();
         } else {
           localStorage.removeItem('currentUser');
           localStorage.removeItem('currentUserPin');
@@ -1097,18 +1131,60 @@
       function openAddRepertoireSongModal(date) {
         currentRepertoireDate = date;
         const modal = document.getElementById('add-repertoire-song-modal');
-        const select = document.getElementById('repertoire-song-select');
+        const input = document.getElementById('repertoire-song-input');
+        const datalist = document.getElementById('repertoire-song-datalist');
         const error = document.getElementById('add-repertoire-song-error');
         error.style.display = 'none';
+        input.value = '';
+        input.focus();
+
+        // Загружаем список песен, если пусто
         if (!allSongs.length) {
           loadSongs(currentUser, currentPin).then(songs => {
             allSongs = songs;
-            fillRepertoireSongSelect(select);
+            fillRepertoireDatalist(datalist);
           }).catch(e => showNotification('Ошибка загрузки песен: ' + e.message, 'error'));
         } else {
-          fillRepertoireSongSelect(select);
+          fillRepertoireDatalist(datalist);
         }
+
         modal.style.display = 'flex';
+      }
+
+      function fillRepertoireDatalist(datalist) {
+        datalist.innerHTML = '';
+        allSongs.forEach(song => {
+          const option = document.createElement('option');
+          option.value = song.name;
+          datalist.appendChild(option);
+        });
+      }
+
+      function applyRepertoireFilter() {
+        const filter = document.getElementById('repertoire-song-filter').value.toLowerCase().trim();
+        const select = document.getElementById('repertoire-song-select');
+        const options = select.querySelectorAll('option');
+        let hasVisible = false;
+        options.forEach(opt => {
+          if (opt.value === '') return; // пропускаем пустой option
+          const text = opt.textContent.toLowerCase();
+          const match = text.includes(filter);
+          opt.style.display = match ? '' : 'none';
+          if (match) hasVisible = true;
+        });
+        // Показываем сообщение, если ничего не найдено
+        const existingMsg = select.parentElement.querySelector('.no-results-msg');
+        if (!hasVisible && filter !== '') {
+          if (!existingMsg) {
+            const msg = document.createElement('div');
+            msg.className = 'no-results-msg';
+            msg.textContent = '❌ Ничего не найдено';
+            msg.style.cssText = 'color:var(--text-muted); font-size:0.9rem; padding:4px 0;';
+            select.parentElement.appendChild(msg);
+          }
+        } else {
+          if (existingMsg) existingMsg.remove();
+        }
       }
 
       function fillRepertoireSongSelect(select) {
@@ -1122,21 +1198,33 @@
       }
 
       document.getElementById('add-repertoire-song-confirm').addEventListener('click', async () => {
-        const select = document.getElementById('repertoire-song-select');
-        const songName = select.value;
+        const input = document.getElementById('repertoire-song-input');
+        const songName = input.value.trim();
+        const error = document.getElementById('add-repertoire-song-error');
+        error.style.display = 'none';
+
         if (!songName) {
-          document.getElementById('add-repertoire-song-error').textContent = 'Выберите песню';
-          document.getElementById('add-repertoire-song-error').style.display = 'block';
+          error.textContent = 'Введите название песни';
+          error.style.display = 'block';
           return;
         }
+
+        // Проверяем, существует ли песня с таким именем (регистронезависимо)
+        const songExists = allSongs.some(s => s.name.toLowerCase() === songName.toLowerCase());
+        if (!songExists) {
+          error.textContent = 'Песня не найдена. Проверьте написание.';
+          error.style.display = 'block';
+          return;
+        }
+
         try {
           showGlobalLoader();
           const entry = repertoireData[currentRepertoireDate];
           const currentSongs = entry ? entry.songs || [] : [];
           const currentSongNames = currentSongs.map(s => typeof s === 'string' ? s : s.name);
 
-          // Проверяем, не дублируется ли песня
-          if (currentSongNames.includes(songName)) {
+          // Проверяем дубликат
+          if (currentSongNames.some(name => name.toLowerCase() === songName.toLowerCase())) {
             showNotification('Эта песня уже есть в репертуаре на эту дату', 'warning');
             hideGlobalLoader();
             return;
@@ -1207,6 +1295,15 @@
           });
           repertoireData = repData;
 
+          try {
+              const songsResp = await fetch(API_URL + '/songs');
+              if (songsResp.ok) {
+                  allSongs = await songsResp.json();
+              }
+          } catch (e) {
+              console.warn('Не удалось загрузить песни', e);
+          }
+
           await autoLogin();
 
           const today = new Date();
@@ -1233,7 +1330,7 @@
           archiveSection.style.display = 'block';
           statsSection.style.display = 'block';
 
-          renderMainTable();
+          renderMainCards();
           renderArchiveTable();
           renderStats();
           renderRepertoire();
@@ -1248,7 +1345,7 @@
       }
 
       // ---------- Рендер основной таблицы (без изменений) ----------
-      function renderMainTable() {
+      function renderMainCards() {
         const container = document.getElementById('main-table-container');
         const paginationEl = document.getElementById('main-pagination');
 
@@ -1266,20 +1363,296 @@
         const end = Math.min(start + PAGE_SIZE, futureDates.length);
         const pageItems = futureDates.slice(start, end);
 
-        container.innerHTML = buildTableHTML(pageItems, false);
-        attachMainEvents();
+        container.innerHTML = buildCardsHTML(pageItems, false);
+        attachCardEvents();
 
         paginationEl.innerHTML = `
-          <button class="prev" ${currentPage === 0 ? 'disabled' : ''}>← Назад</button>
-          <span>${currentPage + 1} / ${totalPages}</span>
-          <button class="next" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
-        `;
+    <button class="prev" ${currentPage === 0 ? 'disabled' : ''}>← Назад</button>
+    <span>${currentPage + 1} / ${totalPages}</span>
+    <button class="next" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
+  `;
         paginationEl.querySelector('.prev').addEventListener('click', () => {
-          if (currentPage > 0) { currentPage--; renderMainTable(); }
+          if (currentPage > 0) { currentPage--; renderMainCards(); }
         });
         paginationEl.querySelector('.next').addEventListener('click', () => {
-          if (currentPage < totalPages - 1) { currentPage++; renderMainTable(); }
+          if (currentPage < totalPages - 1) { currentPage++; renderMainCards(); }
         });
+      }
+
+      function buildCardsHTML(items, isArchive = false) {
+        if (!items || items.length === 0) return '';
+        const names = items[0].names;
+        let html = '<div class="duty-grid">';
+
+        items.forEach(item => {
+          const dateStr = item.dateStr;
+          const row = item.matrixRow;
+          const checkedCount = row.filter(v => v === true).length;
+          const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
+          const fillClass = checkedCount === MAX_PER_DAY ? 'full' : '';
+
+          // Получаем имена только назначенных дежурных
+          const assignedNames = names.filter((name, idx) => row[idx] === true);
+
+          html += `
+      <div class="duty-card" data-date="${dateStr}">
+        <div class="duty-card-header">
+          <span class="duty-date">${formatDateDisplay(dateStr)}</span>
+          <span class="duty-count">${checkedCount}/${MAX_PER_DAY}</span>
+        </div>
+        <div class="duty-card-body">
+          <div class="duty-progress">
+            <div class="progress-bar">
+              <div class="progress-fill ${fillClass}" style="width:${percent}%;"></div>
+            </div>
+          </div>
+          <div class="duty-users">
+            ${assignedNames.map(name => {
+            const isOwn = currentUser && name === currentUser;
+            let cls = 'duty-user selected';
+            if (isArchive) cls += ' disabled';
+            if (!isAdmin && !isOwn) cls += ' disabled';
+            return `<span class="${cls}" data-date="${dateStr}" data-name="${name}" data-checked="true">${name} ✔</span>`;
+          }).join('')}
+          </div>
+          ${!isArchive ? getActionHTML(dateStr, row, names) : ''}
+        </div>
+      </div>
+    `;
+        });
+
+        html += '</div>';
+        return html;
+      }
+
+      function getActionHTML(dateStr, row, names) {
+        const checkedCount = row.filter(v => v === true).length;
+        const currentUserIndex = names.indexOf(currentUser);
+        const isUserSelected = currentUserIndex !== -1 && row[currentUserIndex] === true;
+
+        if (isAdmin) {
+          // Для администратора – кнопка, которая открывает выбор прямо в карточке
+          return `<button class="btn-assign-duty" data-date="${dateStr}">👥 Выбрать дежурного</button>`;
+        }
+
+        if (currentUser) {
+          if (isUserSelected) {
+            return `<button class="btn-take-duty" data-date="${dateStr}" data-action="remove">❌ Отказаться</button>`;
+          } else if (checkedCount < MAX_PER_DAY) {
+            return `<button class="btn-take-duty" data-date="${dateStr}" data-action="add">✅ Занять дату</button>`;
+          } else {
+            return `<span style="font-size:0.8rem; color:var(--text-muted);">⚠️ Мест нет</span>`;
+          }
+        }
+
+        return '';
+      }
+
+      function attachCardEvents() {
+        // Обработка кликов по именам (только для админа) – можно убрать, т.к. теперь используем чекбоксы
+        document.querySelectorAll('.duty-user:not(.disabled)').forEach(el => {
+          el.removeEventListener('click', toggleCell);
+          el.addEventListener('click', toggleCell);
+        });
+
+        // Обработка кнопки "Занять дату" / "Отказаться"
+        document.querySelectorAll('.btn-take-duty').forEach(btn => {
+          btn.removeEventListener('click', handleTakeDuty);
+          btn.addEventListener('click', handleTakeDuty);
+        });
+
+        // Обработка кнопки "Выбрать дежурного" (админ) – раскрытие выбора внутри карточки
+        document.querySelectorAll('.btn-assign-duty').forEach(btn => {
+          btn.removeEventListener('click', handleAssignDutyInline);
+          btn.addEventListener('click', handleAssignDutyInline);
+        });
+      }
+
+      function handleAssignDutyInline(e) {
+        const btn = e.currentTarget;
+        const card = btn.closest('.duty-card');
+        const date = btn.dataset.date;
+        const entry = allDates.find(d => d.dateStr === date);
+        if (!entry) return;
+        const names = entry.names;
+        const row = entry.matrixRow;
+
+        // Если уже открыт выбор – закрываем
+        const existingEditor = card.querySelector('.duty-editor');
+        if (existingEditor) {
+          existingEditor.remove();
+          btn.textContent = '👥 Выбрать дежурного';
+          return;
+        }
+
+        // Строим редактор
+        const editor = document.createElement('div');
+        editor.className = 'duty-editor';
+        editor.style.cssText = 'margin-top:8px; padding-top:8px; border-top:1px solid var(--border-color);';
+
+        const title = document.createElement('div');
+        title.textContent = 'Выберите дежурных (до ' + MAX_PER_DAY + '):';
+        title.style.cssText = 'font-size:0.85rem; margin-bottom:6px; color:var(--text-secondary);';
+        editor.appendChild(title);
+
+        const list = document.createElement('div');
+        list.className = 'duty-select-list';
+        list.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px;';
+
+        const selectedIndices = row.map((v, i) => v ? i : -1).filter(i => i >= 0);
+        let currentSelected = [...selectedIndices];
+
+        names.forEach((name, idx) => {
+          const item = document.createElement('span');
+          item.className = 'duty-select-item' + (currentSelected.includes(idx) ? ' selected' : '');
+          item.textContent = name;
+          item.dataset.idx = idx;
+          item.addEventListener('click', function () {
+            const idx = parseInt(this.dataset.idx);
+            if (this.classList.contains('selected')) {
+              // Снимаем выбор
+              this.classList.remove('selected');
+              currentSelected = currentSelected.filter(i => i !== idx);
+            } else {
+              // Проверяем лимит
+              if (currentSelected.length >= MAX_PER_DAY) {
+                showNotification(`Можно выбрать не более ${MAX_PER_DAY} дежурных`, 'warning');
+                return;
+              }
+              this.classList.add('selected');
+              currentSelected.push(idx);
+            }
+          });
+          list.appendChild(item);
+        });
+
+        editor.appendChild(list);
+
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex; gap:8px; margin-top:8px;';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = '💾 Сохранить';
+        saveBtn.className = 'btn-primary';
+        saveBtn.style.cssText = 'padding:4px 14px; font-size:0.85rem;';
+        saveBtn.addEventListener('click', async function () {
+          if (currentSelected.length > MAX_PER_DAY) {
+            showNotification(`Можно выбрать не более ${MAX_PER_DAY} дежурных`, 'warning');
+            return;
+          }
+          const selectedNames = currentSelected.map(idx => names[idx]);
+          try {
+            showGlobalLoader();
+            // Обновляем назначения
+            for (let i = 0; i < names.length; i++) {
+              const name = names[i];
+              const isSelected = selectedNames.includes(name);
+              const currentRow = allDates.find(d => d.dateStr === date).matrixRow;
+              if (currentRow[i] !== isSelected) {
+                await callToggleDuty(date, name, isSelected);
+              }
+            }
+            await refreshDutyData();
+            showNotification('Дежурные обновлены', 'success');
+            // Закрываем редактор
+            editor.remove();
+            btn.textContent = '👥 Выбрать дежурного';
+          } catch (e) {
+            showNotification('Ошибка: ' + e.message, 'error');
+          } finally {
+            hideGlobalLoader();
+          }
+        });
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Отмена';
+        cancelBtn.className = 'btn-secondary';
+        cancelBtn.style.cssText = 'padding:4px 14px; font-size:0.85rem;';
+        cancelBtn.addEventListener('click', function () {
+          editor.remove();
+          btn.textContent = '👥 Выбрать дежурного';
+        });
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(cancelBtn);
+        editor.appendChild(actions);
+
+        card.querySelector('.duty-card-body').appendChild(editor);
+        btn.textContent = '❌ Закрыть выбор';
+      }
+
+      async function handleTakeDuty(e) {
+        const btn = e.currentTarget;
+        const date = btn.dataset.date;
+        const action = btn.dataset.action; // 'add' или 'remove'
+        const user = currentUser;
+        if (!user) return;
+        const newValue = action === 'add';
+        try {
+          await callToggleDuty(date, user, newValue);
+          await refreshDutyData();
+        } catch (err) { }
+      }
+
+      function handleAssignDuty(e) {
+        const date = e.currentTarget.dataset.date;
+        openAssignDutyModal(date);
+      }
+
+      async function callToggleDuty(dateStr, userName, newValue) {
+        try {
+          showGlobalLoader();
+          const payload = {
+            date_str: dateStr,
+            user_name: userName,
+            value: newValue,
+            changer: currentUser,
+            pin: currentPin
+          };
+          const resp = await fetch(API_URL + '/duty/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await resp.json();
+          if (!resp.ok) throw new Error(result.detail || 'Ошибка сохранения');
+          showNotification('Успешно обновлено', 'success');
+          return true;
+        } catch (e) {
+          showNotification('Ошибка: ' + e.message, 'error');
+          throw e;
+        } finally {
+          hideGlobalLoader();
+        }
+      }
+
+      async function refreshDutyData() {
+        const resp = await fetch(API_URL + '/duty/matrix');
+        if (!resp.ok) throw new Error('Ошибка загрузки графика');
+        const data = await resp.json();
+        const { dates, names, matrix } = data;
+        if (!dates || !names || !matrix) throw new Error('Некорректные данные');
+        allDates = dates.map((dateStr, i) => ({ dateStr, names, matrixRow: matrix[i] || [] }));
+        // Пересортировка
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        futureDates = [];
+        pastDates = [];
+        allDates.forEach(item => {
+          const d = parseDateDDMMYYYY(item.dateStr);
+          if (!d) {
+            futureDates.push(item);
+            return;
+          }
+          d.setHours(0, 0, 0, 0);
+          if (d < today) pastDates.push(item);
+          else futureDates.push(item);
+        });
+        futureDates.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
+        pastDates.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
+        renderMainCards();
+        renderArchiveTable();
+        updateCounts();
       }
 
       // ---------- Рендер архива ----------
@@ -1289,7 +1662,7 @@
           container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Архив пуст.</p>';
           return;
         }
-        container.innerHTML = buildTableHTML(pastDates, true);
+        container.innerHTML = buildCardsHTML(pastDates, true);
       }
 
       // ---------- Построение HTML таблицы (без изменений) ----------
@@ -1361,62 +1734,6 @@
         document.getElementById('archive-count').textContent = `(${pastDates.length})`;
       }
 
-      // ---------- Обработчики для основной таблицы ----------
-      function attachMainEvents() {
-        updateRowStates('main-table-container');
-        const container = document.getElementById('main-table-container');
-        container.querySelectorAll('.cell:not(.archive-cell)').forEach(cell => {
-          cell.removeEventListener('click', toggleCell);
-          cell.addEventListener('click', toggleCell);
-        });
-      }
-
-      // ---------- Обновление состояний строк (с учётом авторизации) ----------
-      function updateRowStates(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        const rows = container.querySelectorAll('tbody tr');
-        rows.forEach(tr => {
-          const cells = tr.querySelectorAll('.cell:not(.archive-cell)');
-          let checkedCount = 0;
-          cells.forEach(cell => {
-            if (cell.dataset.checked === 'true') checkedCount++;
-          });
-
-          const progressFill = tr.querySelector('.progress-fill');
-          const countSpan = tr.querySelector('.progress-wrapper span');
-          if (progressFill) {
-            const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
-            progressFill.style.width = percent + '%';
-            if (checkedCount === MAX_PER_DAY) progressFill.classList.add('full');
-            else progressFill.classList.remove('full');
-          }
-          if (countSpan) countSpan.textContent = `${checkedCount}/${MAX_PER_DAY}`;
-
-          if (checkedCount === MAX_PER_DAY) tr.classList.add('row-full');
-          else tr.classList.remove('row-full');
-
-          const isAuthorized = currentUser && currentUser !== '';
-          cells.forEach(cell => {
-            const cellName = cell.dataset.name;
-            const isOwn = isAuthorized && (cellName === currentUser);
-            if (cell.dataset.checked !== 'true') {
-              if (checkedCount >= MAX_PER_DAY || (!isOwn && !isAdmin)) {
-                cell.classList.add('disabled');
-              } else {
-                cell.classList.remove('disabled');
-              }
-            } else {
-              if (!isOwn && !isAdmin) {
-                cell.classList.add('disabled');
-              } else {
-                cell.classList.remove('disabled');
-              }
-            }
-          });
-        });
-      }
-
       // ---------- Обработчик клика по ячейке (новый эндпоинт) ----------
       async function toggleCell(event) {
         const cell = event.currentTarget;
@@ -1440,11 +1757,6 @@
           : `Вы уверены, что хотите назначить ${name} на ${date}?`;
         if (!confirm(confirmMessage)) return;
 
-        cell.dataset.checked = String(newValue);
-        cell.textContent = newValue ? '✔' : '•';
-        newValue ? cell.classList.add('selected') : cell.classList.remove('selected');
-        updateRowStates('main-table-container');
-
         showGlobalLoader();
         try {
           const payload = {
@@ -1461,12 +1773,10 @@
           });
           const result = await resp.json();
           if (!resp.ok) throw new Error(result.detail || 'Ошибка сохранения');
+          showNotification('Успешно обновлено', 'success');
+          await refreshDutyData();
         } catch (e) {
           showNotification('Ошибка сохранения: ' + e.message, 'error');
-          cell.dataset.checked = String(currentChecked);
-          cell.textContent = currentChecked ? '✔' : '•';
-          currentChecked ? cell.classList.add('selected') : cell.classList.remove('selected');
-          updateRowStates('main-table-container');
           console.error(e);
         } finally {
           hideGlobalLoader();
@@ -1704,9 +2014,9 @@
       }
 
       function attachRepertoireEvents() {
-        document.querySelectorAll('.copy-song-text-btn').forEach(btn => {
-          btn.removeEventListener('click', copySongTextHandler);
-          btn.addEventListener('click', copySongTextHandler);
+        document.querySelectorAll('.song-name.has-text').forEach(el => {
+          el.removeEventListener('click', openViewSongModalHandler);
+          el.addEventListener('click', openViewSongModalHandler);
         });
         if (isAdmin) {
           document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
@@ -1722,6 +2032,11 @@
             btn.addEventListener('click', moveSongDownHandler);
           });
         }
+      }
+
+      function openViewSongModalHandler(e) {
+        const songName = this.dataset.song;
+        openViewSongModal(songName);
       }
 
       async function copySongTextHandler(e) {
@@ -1822,18 +2137,17 @@
                 <div class="repertoire-songs">
                   <div class="repertoire-section-title">🎵 Песни</div>
                   ${songs.length ? songs.map(song => `
-                  <div class="repertoire-song-item">
-                    <span class="song-name">• ${song.name}</span>
-                    <div class="song-actions">
-                      ${song.text ? `<button class="copy-song-text-btn" data-text="${song.text.replace(/"/g, '&quot;')}" title="Копировать текст">📋</button>` : ''}
-                      ${!isArchive && isAdmin ? `
-                        <button class="move-song-up-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вверх">↑</button>
-                        <button class="move-song-down-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вниз">↓</button>
-                        <button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>
-                      ` : ''}
+                    <div class="repertoire-song-item">
+                      <span class="song-name ${song.text ? 'has-text' : ''}" data-song="${song.name}" ${song.text ? 'style="cursor:pointer;"' : ''}>• ${song.name}</span>
+                      <div class="song-actions">
+                        ${!isArchive && isAdmin ? `
+                          <button class="move-song-up-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вверх">↑</button>
+                          <button class="move-song-down-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вниз">↓</button>
+                          <button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>
+                        ` : ''}
+                      </div>
                     </div>
-                  </div>
-                `).join('') : '<div class="repertoire-empty">—</div>'}
+                  `).join('') : '<div class="repertoire-empty">—</div>'}
                 </div>
                 <div class="repertoire-colors">
                   <div class="repertoire-section-title">🎨 Цвета</div>
@@ -1888,6 +2202,88 @@
         const lower = colorName.toLowerCase().trim();
         return colorMap[lower] || '🎨';
       }
+
+      let assignDate = '';
+      let assignUsers = [];
+      let assignSelected = [];
+
+      document.getElementById('assign-duty-modal-close').addEventListener('click', () => {
+        document.getElementById('assign-duty-modal').style.display = 'none';
+      });
+      document.getElementById('assign-duty-cancel').addEventListener('click', () => {
+        document.getElementById('assign-duty-modal').style.display = 'none';
+      });
+
+      document.getElementById('assign-duty-save').addEventListener('click', async function () {
+        if (assignSelected.length > MAX_PER_DAY) {
+          showNotification(`Можно выбрать не более ${MAX_PER_DAY} дежурных`, 'warning');
+          return;
+        }
+        try {
+          showGlobalLoader();
+          const selectedNames = assignSelected.map(idx => assignUsers[idx]);
+          // Обновляем назначения
+          for (let i = 0; i < assignUsers.length; i++) {
+            const name = assignUsers[i];
+            const isSelected = selectedNames.includes(name);
+            const currentRow = allDates.find(d => d.dateStr === assignDate).matrixRow;
+            if (currentRow[i] !== isSelected) {
+              await callToggleDuty(assignDate, name, isSelected);
+            }
+          }
+          document.getElementById('assign-duty-modal').style.display = 'none';
+          await refreshDutyData();
+          showNotification('Дежурные обновлены', 'success');
+        } catch (e) {
+          showNotification('Ошибка: ' + e.message, 'error');
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
+      function openViewSongModal(songName) {
+        const modal = document.getElementById('view-song-text-modal');
+        const nameDisplay = document.getElementById('view-song-name-display');
+        const content = document.getElementById('view-song-text-content');
+        const error = document.getElementById('view-song-text-error');
+        error.style.display = 'none';
+
+        const song = allSongs.find(s => s.name === songName);
+        if (!song || !song.text) {
+          showNotification('Текст не найден', 'warning');
+          return;
+        }
+
+        nameDisplay.textContent = songName;
+        content.textContent = song.text;
+        modal.style.display = 'flex';
+        document.getElementById('view-song-copy-btn').dataset.text = song.text;
+      }
+
+      // Закрытие модалки
+      document.getElementById('view-song-modal-close').addEventListener('click', () => {
+        document.getElementById('view-song-text-modal').style.display = 'none';
+      });
+      document.getElementById('view-song-modal-close-btn').addEventListener('click', () => {
+        document.getElementById('view-song-text-modal').style.display = 'none';
+      });
+      document.getElementById('view-song-text-modal').addEventListener('click', function (e) {
+        if (e.target === this) {
+          this.style.display = 'none';
+        }
+      });
+
+      // Копирование текста
+      document.getElementById('view-song-copy-btn').addEventListener('click', function () {
+        const text = this.dataset.text;
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+          showNotification('Текст скопирован', 'success');
+          document.getElementById('view-song-text-modal').style.display = 'none';
+        }).catch(() => {
+          showNotification('Не удалось скопировать текст', 'error');
+        });
+      });
 
       // Запуск
       loadData();

@@ -1494,3 +1494,289 @@ tbody tr:has(.cell.selected) td:first-child {
     padding: 12px 14px;
   }
 }
+
+/* ---------- Карточки графика ---------- */
+.duty-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.duty-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  border: 1px solid var(--border-color);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.duty-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--shadow-color);
+}
+
+.duty-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.duty-date {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.duty-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg-cell);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.duty-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.duty-progress {
+  width: 100%;
+}
+
+.duty-users {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.duty-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--bg-cell);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  border: 1px solid transparent;
+}
+
+.duty-user.selected {
+  background: var(--bg-cell-selected);
+  color: var(--text-selected);
+  border-color: var(--border-selected);
+}
+
+.duty-user:not(.disabled):hover {
+  background: var(--bg-cell-hover);
+}
+
+.duty-user.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.duty-user .selected-icon {
+  font-size: 0.7rem;
+}
+
+/* ---------- Карточки графика ---------- */
+.duty-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.duty-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  border: 1px solid var(--border-color);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.duty-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--shadow-color);
+}
+
+.duty-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.duty-date {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.duty-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg-cell);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.duty-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.duty-progress {
+  width: 100%;
+}
+
+.duty-users {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.duty-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--bg-cell);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  border: 1px solid transparent;
+}
+
+.duty-user.selected {
+  background: var(--bg-cell-selected);
+  color: var(--text-selected);
+  border-color: var(--border-selected);
+}
+
+.duty-user:not(.disabled):hover {
+  background: var(--bg-cell-hover);
+}
+
+.duty-user.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.btn-take-duty,
+.btn-assign-duty {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 0.85rem;
+  margin-top: 4px;
+  align-self: flex-start;
+}
+
+.btn-take-duty {
+  background: #4f46e5;
+  color: #fff;
+}
+.btn-take-duty:hover {
+  background: #4338ca;
+}
+
+.btn-assign-duty {
+  background: #4f46e5;
+  color: #fff;
+}
+.btn-assign-duty:hover {
+  background: #4338ca;
+}
+
+/* ---------- Бейджики для выбора дежурных (админ) ---------- */
+.duty-select-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.duty-select-item {
+  padding: 4px 14px;
+  border-radius: 16px;
+  background: var(--bg-cell);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  user-select: none;
+}
+
+.duty-select-item:hover {
+  background: var(--bg-cell-hover);
+}
+
+.duty-select-item.selected {
+  background: var(--bg-cell-selected);
+  border-color: var(--border-selected);
+  color: var(--text-selected);
+}
+
+.duty-select-item.selected:hover {
+  background: var(--bg-cell-selected-hover);
+}
+
+.duty-editor .btn-primary,
+.duty-editor .btn-secondary {
+  font-size: 0.85rem;
+  padding: 4px 14px;
+}
+
+.song-name.has-text {
+  font-weight: 600;
+  color: var(--text-selected);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.song-name.has-text:hover {
+  text-decoration: underline;
+  color: var(--border-selected);
+}
+
+/* Карточки архива (наследуют стили от обычных карточек) */
+.archive-table .duty-card {
+  opacity: 0.85;
+}
+.archive-table .duty-card .duty-date {
+  color: var(--text-muted);
+}
+.archive-table .duty-card .duty-count {
+  background: var(--bg-cell);
+}
+.archive-table .duty-card .duty-user {
+  background: var(--bg-cell);
+  color: var(--text-muted);
+}
+.archive-table .duty-card .duty-user.selected {
+  background: var(--bg-cell-hover);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+}
