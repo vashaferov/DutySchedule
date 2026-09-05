@@ -77,12 +77,14 @@ jobs:
             echo "Starting containers..."
             $DOCKER_COMPOSE up -d --force-recreate --build
 
-            # Миграция (обход Drone)
-            [ -f ~/duty/.migrated ] || {
+            # Проверка, инициализирована ли БД (есть ли таблица users)
+            echo "Checking if database is initialized..."
+            if $DOCKER_COMPOSE exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -c "SELECT 1 FROM users LIMIT 1;" &>/dev/null; then
+                echo "⏭️ База данных уже инициализирована, миграция не требуется."
+            else
                 echo "🔄 Запускаем миграцию данных..."
-                $DOCKER_COMPOSE run --rm migrate || echo "⚠️ Migration failed, but continuing..."
-                touch ~/duty/.migrated
+                $DOCKER_COMPOSE run --rm migrate
                 echo "✅ Миграция завершена"
-            }
+            fi
 
             echo "✅ Deployment completed successfully."
