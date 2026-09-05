@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from models import User, DutyDate, DutyAssignment, Song, Repertoire, DateColor, Base, SyncMetadata
-import datetime
+from datetime import datetime
 
 load_dotenv()
 
