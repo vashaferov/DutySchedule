@@ -68,3 +68,13 @@ class SyncMetadata(Base):
     key = Column(String(50), primary_key=True)
     value = Column(Text)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class SyncHistory(Base):
+    __tablename__ = "sync_history"
+    id = Column(Integer, primary_key=True)
+    started_at = Column(DateTime, default=func.now())
+    finished_at = Column(DateTime)
+    status = Column(String(20), default="pending")
+    details = Column(Text)
+    triggered_by = Column(String(100))
+    changes_summary = Column(Text)

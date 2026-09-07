@@ -27,6 +27,7 @@ def toggle_duty(req: schemas.DutyToggleRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="Not authorized")
     try:
         crud.toggle_duty(db, req.date_str, req.user_name, req.value)
+        crud.set_sync_flag(db, True, req.changer)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

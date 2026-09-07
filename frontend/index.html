@@ -163,19 +163,24 @@
 
           <!-- Создание пользователя -->
           <div style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
-            <h4>➕ Создать пользователя</h4>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-              <input type="text" id="admin-create-name" placeholder="Имя" class="modal-input"
-                style="width:auto; flex:1; min-width:120px;">
-              <input type="text" id="admin-create-pin" placeholder="PIN" class="modal-input"
-                style="width:auto; flex:1; min-width:80px;">
-              <button id="admin-create-user-btn" class="btn-primary" style="padding:6px 14px;">Создать</button>
+            <div id="admin-create-block" style="display:none; margin-top:12px;">
+              <h4 style="margin-bottom:8px;">Создать пользователя</h4>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                <input type="text" id="admin-create-name" placeholder="Имя" class="modal-input"
+                  style="width:auto; flex:1; min-width:120px;">
+                <input type="text" id="admin-create-pin" placeholder="PIN" class="modal-input"
+                  style="width:auto; flex:1; min-width:80px;">
+                <button id="admin-create-user-btn" class="btn-primary" style="padding:6px 14px;">Создать</button>
+                <button id="admin-create-cancel-btn" class="btn-secondary" style="padding:6px 14px;">Отмена</button>
+              </div>
+              <div id="admin-create-error" class="modal-error"></div>
             </div>
-            <div id="admin-create-error" class="modal-error"></div>
           </div>
 
           <!-- Кнопка синхронизации -->
-          <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+          <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
+            <button id="admin-sync-history-btn" class="btn-secondary" style="padding:6px 14px;">📋 История
+              синхронизаций</button>
             <button id="admin-sync-btn" class="btn-primary" style="background:#f59e0b; color:#fff;">🔄 Запустить
               синхронизацию</button>
           </div>
@@ -305,6 +310,18 @@
         <div class="modal-footer">
           <button class="btn-secondary" id="assign-duty-cancel">Отмена</button>
           <button class="btn-primary" id="assign-duty-save">💾 Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sync-history-modal" class="modal-overlay">
+      <div class="modal-content wide">
+        <div class="modal-header">
+          <h3>📋 История синхронизаций</h3>
+          <button class="modal-close-btn" id="sync-history-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="sync-history-list"></div>
         </div>
       </div>
     </div>
@@ -654,6 +671,10 @@
           renderAdminSearchResults('');
           document.getElementById('admin-selected-user').style.display = 'none';
           document.getElementById('admin-modal').style.display = 'flex';
+          document.getElementById('admin-create-block').style.display = 'none';
+          document.getElementById('admin-create-name').value = '';
+          document.getElementById('admin-create-pin').value = '';
+          document.getElementById('admin-create-error').style.display = 'none';
         } catch (e) {
           showNotification('Ошибка загрузки пользователей: ' + e.message, 'error');
         } finally {
@@ -661,25 +682,66 @@
         }
       });
 
+      document.getElementById('admin-create-cancel-btn').addEventListener('click', function () {
+        const createBlock = document.getElementById('admin-create-block');
+        const addChip = document.getElementById('add-user-chip');
+        if (createBlock) {
+          createBlock.style.display = 'none';
+          if (addChip) addChip.style.display = 'inline-block';
+          document.getElementById('admin-create-name').value = '';
+          document.getElementById('admin-create-pin').value = '';
+          document.getElementById('admin-create-error').style.display = 'none';
+        }
+      });
+
       function renderAdminSearchResults(query) {
         const container = document.getElementById('admin-search-results');
         const filtered = allUsers.filter(u => u.name.toLowerCase().includes(query.toLowerCase()));
-        if (filtered.length === 0) {
-          container.innerHTML = '<p style="color:var(--text-muted); margin-top:4px;">Пользователи не найдены</p>';
-          return;
+
+        let html = '';
+        if (filtered.length === 0 && query !== '') {
+          html = '<p style="color:var(--text-muted); margin-top:4px;">Пользователи не найдены</p>';
+        } else {
+          html = '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">';
+          filtered.forEach(u => {
+            html += `<span class="admin-user-chip" data-name="${u.name}" style="padding:4px 12px; border-radius:16px; background:var(--bg-cell); cursor:pointer; border:1px solid var(--border-color);">${u.name}</span>`;
+          });
+          const createBlock = document.getElementById('admin-create-block');
+          if (createBlock.style.display === 'none' || createBlock.style.display === '') {
+            html += `<span id="add-user-chip" class="admin-user-chip" style="padding:4px 12px; border-radius:16px; background:var(--bg-cell-selected); border-color:var(--border-selected); cursor:pointer;">➕ Добавить</span>`;
+          }
+          html += '</div>';
         }
-        let html = '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">';
-        filtered.forEach(u => {
-          html += `<span class="admin-user-chip" data-name="${u.name}" style="padding:4px 12px; border-radius:16px; background:var(--bg-cell); cursor:pointer; border:1px solid var(--border-color);">${u.name}</span>`;
-        });
-        html += '</div>';
         container.innerHTML = html;
-        container.querySelectorAll('.admin-user-chip').forEach(el => {
+
+        // Обработчики для чипов пользователей
+        container.querySelectorAll('.admin-user-chip[data-name]').forEach(el => {
           el.addEventListener('click', function () {
             const name = this.dataset.name;
             selectAdminUser(name);
           });
         });
+
+        // Обработчик для чипа "➕ Добавить"
+        const addChip = document.getElementById('add-user-chip');
+        if (addChip) {
+          addChip.addEventListener('click', function () {
+            showCreateUserBlock();
+          });
+        }
+      }
+
+      function showCreateUserBlock() {
+        const createBlock = document.getElementById('admin-create-block');
+        const addChip = document.getElementById('add-user-chip');
+        if (createBlock) {
+          createBlock.style.display = 'block';
+          if (addChip) addChip.style.display = 'none';
+          document.getElementById('admin-create-name').value = '';
+          document.getElementById('admin-create-pin').value = '';
+          document.getElementById('admin-create-error').style.display = 'none';
+          document.getElementById('admin-create-name').focus();
+        }
       }
 
       function selectAdminUser(name) {
@@ -823,10 +885,14 @@
           const result = await resp.json();
           if (!resp.ok) throw new Error(result.detail || 'Ошибка');
           showNotification('Пользователь создан', 'success');
+          // Скрываем блок создания
+          document.getElementById('admin-create-block').style.display = 'none';
+          const addChip = document.getElementById('add-user-chip');
+          if (addChip) addChip.style.display = 'inline-block';
           document.getElementById('admin-create-name').value = '';
           document.getElementById('admin-create-pin').value = '';
           document.getElementById('admin-create-error').style.display = 'none';
-          // Обновим список
+          // Обновляем список пользователей
           const userList = await loadUsersForAdmin(currentUser, currentPin);
           allUsers = userList;
           renderAdminSearchResults(document.getElementById('admin-search-input').value);
@@ -1296,12 +1362,12 @@
           repertoireData = repData;
 
           try {
-              const songsResp = await fetch(API_URL + '/songs/');
-              if (songsResp.ok) {
-                  allSongs = await songsResp.json();
-              }
+            const songsResp = await fetch(API_URL + '/songs/');
+            if (songsResp.ok) {
+              allSongs = await songsResp.json();
+            }
           } catch (e) {
-              console.warn('Не удалось загрузить песни', e);
+            console.warn('Не удалось загрузить песни', e);
           }
 
           await autoLogin();
@@ -2283,6 +2349,48 @@
         }).catch(() => {
           showNotification('Не удалось скопировать текст', 'error');
         });
+      });
+
+      document.getElementById('admin-sync-history-btn').addEventListener('click', async function () {
+        if (!isAdmin) return;
+        try {
+          showGlobalLoader();
+          const resp = await fetch(`${API_URL}/sync/history?admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`);
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || 'Ошибка');
+          const container = document.getElementById('sync-history-list');
+          if (data.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);">История синхронизаций пуста.</p>';
+          } else {
+            let html = `<table style="width:100%; border-collapse:collapse;">
+                <thead><tr>
+                    <th style="text-align:left; padding:8px;">Дата</th>
+                    <th style="text-align:left; padding:8px;">Кто</th>
+                    <th style="text-align:left; padding:8px;">Статус</th>
+                    <th style="text-align:left; padding:8px;">Детали</th>
+                </tr></thead><tbody>`;
+            data.forEach(row => {
+              const statusColor = row.status === 'success' ? 'green' : row.status === 'error' ? 'red' : 'orange';
+              html += `<tr>
+                    <td style="padding:8px;">${new Date(row.started_at).toLocaleString()}</td>
+                    <td style="padding:8px;">${row.triggered_by || 'auto'}</td>
+                    <td style="padding:8px; color:${statusColor};">${row.status}</td>
+                    <td style="padding:8px;">${row.details || row.changes_summary || '—'}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+          }
+          document.getElementById('sync-history-modal').style.display = 'flex';
+        } catch (e) {
+          showNotification('Ошибка загрузки истории: ' + e.message, 'error');
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
+      document.getElementById('sync-history-close').addEventListener('click', () => {
+        document.getElementById('sync-history-modal').style.display = 'none';
       });
 
       // Запуск

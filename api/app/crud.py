@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from passlib.context import CryptContext
 from . import models, schemas
 
@@ -61,6 +61,8 @@ def toggle_duty(db: Session, date_str: str, user_name: str, value: bool):
     else:
         if assignment:
             db.delete(assignment)
+
+    date.updated_at = func.now()
     db.commit()
     return True
 
@@ -107,6 +109,7 @@ def set_repertoire_songs(db: Session, date_str: str, song_names: list):
         if song:
             rep = models.Repertoire(date_id=date.id, song_id=song.id, position=pos)
             db.add(rep)
+    date.updated_at = func.now()
     db.commit()
 
 # ---------- Users (admin) ----------
@@ -172,12 +175,46 @@ def get_full_repertoire(db: Session):
 
 def update_repertoire_for_date(db: Session, date_str: str, song_names: list):
     date = get_or_create_date(db, date_str)
-    # удаляем старые записи
     db.query(models.Repertoire).filter(models.Repertoire.date_id == date.id).delete()
-    # добавляем новые
     for pos, name in enumerate(song_names):
         song = db.query(models.Song).filter(models.Song.name == name).first()
         if song:
             rep = models.Repertoire(date_id=date.id, song_id=song.id, position=pos)
             db.add(rep)
+    date.updated_at = func.now()
     db.commit()
+
+    # ---------- Sync History ----------
+def set_sync_flag(db: Session, needs_sync: bool = True, triggered_by: str = 'auto'):
+    row = db.query(models.SyncMetadata).filter(models.SyncMetadata.key == 'sync_flag').first()
+    if not row:
+        row = models.SyncMetadata(key='sync_flag', value='')
+        db.add(row)
+    row.value = str(needs_sync)
+    row.updated_at = func.now()
+    db.commit()
+
+def get_sync_flag(db: Session) -> bool:
+    row = db.query(models.SyncMetadata).filter(models.SyncMetadata.key == 'sync_flag').first()
+    if not row:
+        return False
+    return row.value.lower() == 'true'
+
+def create_sync_history(db: Session, triggered_by: str = 'auto', changes_summary: str = None) -> int:
+    history = models.SyncHistory(triggered_by=triggered_by, changes_summary=changes_summary, status='pending')
+    db.add(history)
+    db.commit()
+    db.refresh(history)
+    return history.id
+
+def update_sync_history(db: Session, history_id: int, status: str, details: str = None):
+    history = db.query(models.SyncHistory).filter(models.SyncHistory.id == history_id).first()
+    if history:
+        history.status = status
+        history.finished_at = func.now()
+        if details:
+            history.details = details
+        db.commit()
+
+def get_sync_history(db: Session, limit: int = 50):
+    return db.query(models.SyncHistory).order_by(models.SyncHistory.id.desc()).limit(limit).all()

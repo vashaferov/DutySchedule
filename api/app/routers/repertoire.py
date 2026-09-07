@@ -16,6 +16,7 @@ def update_repertoire(date_str: str, req: schemas.RepertoireUpdateRequest, chang
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
         crud.update_repertoire_for_date(db, date_str, req.songs)
+        crud.set_sync_flag(db, True, changer)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -33,6 +34,7 @@ def delete_song_from_repertoire(date_str: str, song_name: str, changer: str = Qu
             raise HTTPException(status_code=404, detail="Song not found in repertoire")
         new_songs = [s["name"] for s in songs if s["name"] != song_name]
         crud.update_repertoire_for_date(db, date_str, new_songs)
+        crud.set_sync_flag(db, True, changer)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

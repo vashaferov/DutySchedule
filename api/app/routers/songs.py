@@ -14,6 +14,7 @@ def create_song(song: schemas.SongCreate, changer: str = Query(...), pin: str = 
     if not crud.verify_pin(db, changer, pin) or not crud.is_admin(db, changer):
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
+        crud.set_sync_flag(db, True, changer)
         return crud.create_song(db, song)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -24,6 +25,7 @@ def update_song_text(name: str, new_text: str = Query(...), changer: str = Query
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
         song = crud.update_song_text(db, name, new_text)
+        crud.set_sync_flag(db, True, changer)
         return {"success": True, "song": song}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -34,6 +36,7 @@ def delete_song(name: str, changer: str = Query(...), pin: str = Query(...), db:
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
         crud.delete_song(db, name)
+        crud.set_sync_flag(db, True, changer)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

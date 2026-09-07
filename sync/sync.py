@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from models import User, DutyDate, DutyAssignment, Song, Repertoire, DateColor, Base, SyncMetadata
+from models import User, DutyDate, DutyAssignment, Song, Repertoire, DateColor, Base, SyncMetadata, SyncHistory
 from datetime import datetime
 
 load_dotenv()
@@ -19,10 +19,9 @@ logger = logging.getLogger(__name__)
 # ---------- Настройки ----------
 DATABASE_URL = os.getenv("DATABASE_URL")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_SHEETS_CREDENTIALS")  # base64 или путь
+GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
 
 if not GOOGLE_CREDENTIALS_JSON:
-    # пробуем загрузить из файла
     try:
         with open("credentials.json", "r") as f:
             creds_dict = json.load(f)
@@ -31,29 +30,27 @@ if not GOOGLE_CREDENTIALS_JSON:
         exit(1)
 else:
     try:
-        # Пробуем декодировать как base64
         decoded = base64.b64decode(GOOGLE_CREDENTIALS_JSON).decode('utf-8')
         creds_dict = json.loads(decoded)
     except Exception:
-        # Если не base64, пробуем как обычный JSON
         creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
 
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
-# Подключение к БД
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
+
 def sync_sheet_headers(sheet, headers, start_row=1, start_col=1):
-    """Записывает заголовки в первую строку листа"""
     for col, header in enumerate(headers, start=start_col):
         sheet.update_cell(start_row, col, header)
 
+
 def clear_sheet(sheet):
-    """Очищает весь лист"""
     sheet.clear()
+
 
 def sync_users(db):
     sheet = client.open_by_key(SPREADSHEET_ID).worksheet("Пользователи")
@@ -63,13 +60,13 @@ def sync_users(db):
     sync_sheet_headers(sheet, headers)
     rows = []
     for u in users:
-        rows.append([u.name, '', u.role])  # не сохраняем PIN обратно
+        rows.append([u.name, '', u.role])
     if rows:
         sheet.append_rows(rows, value_input_option='RAW', table_range='A2')
     logger.info(f"Synced {len(rows)} users")
 
+
 def sync_duty(db):
-    """Синхронизирует основной лист 'График' только если были изменения"""
     last_sync = get_last_sync_time(db, 'last_sync_duty')
     if not has_duty_changes(db, last_sync):
         logger.info("No changes in duty data, skipping sync")
@@ -93,19 +90,18 @@ def sync_duty(db):
         rows.append(row)
     if rows:
         sheet.append_rows(rows, value_input_option='RAW', table_range='A2')
-    # Обновляем время последней синхронизации
     set_last_sync_time(db, 'last_sync_duty')
     logger.info(f"Synced {len(rows)} duty dates")
 
+
 def sync_repertoire(db):
-    """Синхронизирует лист 'репертуар' только если были изменения"""
     last_sync = get_last_sync_time(db, 'last_sync_repertoire')
     if not has_repertoire_changes(db, last_sync):
         logger.info("No changes in repertoire data, skipping sync")
         return
 
     logger.info("Syncing repertoire...")
-    sheet = client.open_by_key(SPREADSHEET_ID).worksheet("репертуар")
+    sheet = client.open_by_key(SPREADSHEET_ID).worksheet("Репертуар")
     clear_sheet(sheet)
     dates = db.query(DutyDate).order_by(DutyDate.date_str).all()
     headers = ["Дата", "Песни", "Цвета"]
@@ -127,36 +123,13 @@ def sync_repertoire(db):
     set_last_sync_time(db, 'last_sync_repertoire')
     logger.info(f"Synced {len(rows)} repertoire entries")
 
-def sync_repertoire(db):
-    """Синхронизирует лист 'репертуар'"""
-    sheet = client.open_by_key(SPREADSHEET_ID).worksheet("Репертуар")
-    clear_sheet(sheet)
-    dates = db.query(DutyDate).order_by(DutyDate.date_str).all()
-    headers = ["Дата", "Песни", "Цвета"]
-    sync_sheet_headers(sheet, headers)
-    rows = []
-    for date in dates:
-        # Песни
-        rep_items = db.query(Repertoire).filter(Repertoire.date_id == date.id).order_by(Repertoire.position).all()
-        song_names = []
-        for item in rep_items:
-            song = db.query(Song).filter(Song.id == item.song_id).first()
-            if song:
-                song_names.append(song.name)
-        songs_str = "\n".join(song_names)
-        # Цвета
-        colors = db.query(DateColor).filter(DateColor.date_id == date.id).all()
-        colors_str = "\n".join([c.color for c in colors])
-        rows.append([date.date_str, songs_str, colors_str])
-    if rows:
-        sheet.append_rows(rows, value_input_option='RAW', table_range='A2')
-    logger.info(f"Synced {len(rows)} repertoire entries")
 
 def get_last_sync_time(db, key='last_sync'):
     row = db.query(SyncMetadata).filter(SyncMetadata.key == key).first()
     if row:
         return row.value
     return None
+
 
 def set_last_sync_time(db, key='last_sync', value=None):
     if value is None:
@@ -169,16 +142,16 @@ def set_last_sync_time(db, key='last_sync', value=None):
         db.add(row)
     db.commit()
 
+
 def has_duty_changes(db, last_sync):
     if not last_sync:
         return True
-    # Проверяем изменения в duty_dates
     count = db.query(DutyDate).filter(DutyDate.updated_at > last_sync).count()
     if count > 0:
         return True
-    # Проверяем изменения в duty_assignments
     count = db.query(DutyAssignment).filter(DutyAssignment.updated_at > last_sync).count()
     return count > 0
+
 
 def has_repertoire_changes(db, last_sync):
     if not last_sync:
@@ -186,33 +159,65 @@ def has_repertoire_changes(db, last_sync):
     count = db.query(Repertoire).filter(Repertoire.updated_at > last_sync).count()
     if count > 0:
         return True
-    # Также проверим изменения в duty_dates (даты могли добавиться)
     count = db.query(DutyDate).filter(DutyDate.updated_at > last_sync).count()
     return count > 0
+
+
+# ---------- История синхронизаций (добавлено) ----------
+def create_sync_history(db, triggered_by='auto', changes_summary=None):
+    history = SyncHistory(
+        triggered_by=triggered_by,
+        changes_summary=changes_summary,
+        status='pending'
+    )
+    db.add(history)
+    db.commit()
+    db.refresh(history)
+    return history.id
+
+
+def update_sync_history(db, history_id, status, details=None):
+    history = db.query(SyncHistory).filter(SyncHistory.id == history_id).first()
+    if history:
+        history.status = status
+        history.finished_at = datetime.now()
+        if details:
+            history.details = details
+        db.commit()
+# -------------------------------------------------
+
 
 def main_sync():
     db = SessionLocal()
     try:
-        sync_duty(db)
-        sync_repertoire(db)
+        flag_row = db.query(SyncMetadata).filter(SyncMetadata.key == 'sync_flag').first()
+        if not flag_row or flag_row.value.lower() != 'true':
+            logger.info("No sync needed")
+            return
+
+        triggered_by = 'auto'
+        changes_summary = 'Scheduled sync'
+
+        history_id = create_sync_history(db, triggered_by, changes_summary)
+        try:
+            sync_duty(db)
+            sync_repertoire(db)
+            flag_row.value = 'false'
+            db.commit()
+            update_sync_history(db, history_id, 'success', 'Sync completed successfully')
+            logger.info("Sync completed successfully")
+        except Exception as e:
+            error_msg = str(e)
+            db.rollback()
+            update_sync_history(db, history_id, 'error', error_msg)
+            logger.error(f"Sync failed: {error_msg}")
     except Exception as e:
         logger.error(f"Sync failed: {e}")
     finally:
         db.close()
 
+
 if __name__ == "__main__":
-    import sys
-    if "--http" in sys.argv:
-        # Запускаем HTTP-сервер
-        from http_server import app
-        import uvicorn
-        uvicorn.run(app, host="0.0.0.0", port=8001)
-    elif "--once" in sys.argv:
+    while True:
         main_sync()
-    else:
-        # обычный цикл с субботами
-        while True:
-            now = datetime.datetime.now()
-            if now.weekday() == 5:
-                main_sync()
-            time.sleep(3600)
+        time.sleep(30)
