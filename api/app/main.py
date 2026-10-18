@@ -1,10 +1,25 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from .database import Base, engine
+from . import models  # noqa: F401  — импорт нужен, чтобы таблицы попали в Base.metadata
 from .routers import duty, songs, users, auth, repertoire, sync, sync_history
 
-app = FastAPI(title="Duty Schedule API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Создаём недостающие таблицы при старте.
+    # Раньше create_all жил только в migrate_data.py, поэтому на пустой БД API
+    # поднимался без схемы и все запросы падали с "relation does not exist".
+    # create_all идемпотентен и НЕ трогает существующие таблицы: на живой базе
+    # это no-op (миграций в проекте нет, схема только дополняется).
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="Duty Schedule API", version="1.0.0", lifespan=lifespan)
 
 # CORS – разрешаем запросы с фронтенда
 # Фронтенд (статика) и API отдаются одним nginx на mediahlg.ru,

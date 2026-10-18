@@ -385,7 +385,7 @@
         toast.className = `toast toast-${type}`;
         toast.innerHTML = `
     <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
-    <span class="toast-message">${message}</span>
+    <span class="toast-message">${escapeHtml(message)}</span>
     <button class="toast-close">&times;</button>
   `;
 
@@ -760,7 +760,7 @@
         } else {
           html = '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">';
           filtered.forEach(u => {
-            html += `<span class="admin-user-chip" data-name="${u.name}" style="padding:4px 12px; border-radius:16px; background:var(--bg-cell); cursor:pointer; border:1px solid var(--border-color);">${u.name}</span>`;
+            html += `<span class="admin-user-chip" data-name="${escapeHtml(u.name)}" style="padding:4px 12px; border-radius:16px; background:var(--bg-cell); cursor:pointer; border:1px solid var(--border-color);">${escapeHtml(u.name)}</span>`;
           });
           const createBlock = document.getElementById('admin-create-block');
           if (createBlock.style.display === 'none' || createBlock.style.display === '') {
@@ -1006,8 +1006,8 @@
         const errEl = document.getElementById('add-date-error');
         const dateStr = input.value.trim().replace(/\s+/g, ' ');
 
-        if (!/^\d{2}\.\d{2}\.\d{4}(\s*\(.+\))?$/.test(dateStr)) {
-          errEl.textContent = 'Формат: ДД.ММ.ГГГГ (пояснение в скобках — по желанию)';
+        if (!/^\d{2}\.\d{2}\.\d{4}(\s*\([^<>"'`&/\\#?]+\))?$/.test(dateStr)) {
+          errEl.textContent = 'Формат: ДД.ММ.ГГГГ (пояснение в скобках). В пояснении нельзя символы < > " \' & / # ?';
           errEl.style.display = 'block';
           return;
         }
@@ -1514,7 +1514,7 @@
           updateCounts();
 
         } catch (e) {
-          loading.innerHTML = `<div style="color:#ef4444; padding:20px;">❌ ${e.message}</div>`;
+          loading.innerHTML = `<div style="color:#ef4444; padding:20px;">❌ ${escapeHtml(e.message)}</div>`;
           console.error(e);
         } finally {
           hideGlobalLoader();
@@ -1572,9 +1572,9 @@
           const assignedNames = names.filter((name, idx) => row[idx] === true);
 
           html += `
-      <div class="duty-card" data-date="${dateStr}">
+      <div class="duty-card" data-date="${escapeHtml(dateStr)}">
         <div class="duty-card-header">
-          <span class="duty-date">${formatDateDisplay(dateStr)}</span>
+          <span class="duty-date">${escapeHtml(formatDateDisplay(dateStr))}</span>
           <span class="duty-card-header-right">
             <span class="duty-count">${checkedCount}/${MAX_PER_DAY}</span>
             ${isAdmin ? '<button class="btn-delete-date" title="Удалить дату" aria-label="Удалить дату">🗑️</button>' : ''}
@@ -1592,7 +1592,7 @@
             let cls = 'duty-user selected';
             if (isArchive) cls += ' disabled';
             if (!isAdmin && !isOwn) cls += ' disabled';
-            return `<span class="${cls}" data-date="${dateStr}" data-name="${name}" data-checked="true">${name} ✔</span>`;
+            return `<span class="${cls}" data-date="${escapeHtml(dateStr)}" data-name="${escapeHtml(name)}" data-checked="true">${escapeHtml(name)} ✔</span>`;
           }).join('')}
           </div>
           ${!isArchive ? getActionHTML(dateStr, row, names) : ''}
@@ -1612,14 +1612,14 @@
 
         if (isAdmin) {
           // Для администратора – кнопка, которая открывает выбор прямо в карточке
-          return `<button class="btn-assign-duty" data-date="${dateStr}">👥 Выбрать дежурного</button>`;
+          return `<button class="btn-assign-duty" data-date="${escapeHtml(dateStr)}">👥 Выбрать дежурного</button>`;
         }
 
         if (currentUser) {
           if (isUserSelected) {
-            return `<button class="btn-take-duty" data-date="${dateStr}" data-action="remove">❌ Отказаться</button>`;
+            return `<button class="btn-take-duty" data-date="${escapeHtml(dateStr)}" data-action="remove">❌ Отказаться</button>`;
           } else if (checkedCount < MAX_PER_DAY) {
-            return `<button class="btn-take-duty" data-date="${dateStr}" data-action="add">✅ Занять дату</button>`;
+            return `<button class="btn-take-duty" data-date="${escapeHtml(dateStr)}" data-action="add">✅ Занять дату</button>`;
           } else {
             return `<span style="font-size:0.8rem; color:var(--text-muted);">⚠️ Мест нет</span>`;
           }
@@ -1900,7 +1900,7 @@
               <thead>
                 <tr>
                   <th>Дата</th>
-                  ${names.map(name => `<th>${name}</th>`).join('')}
+                  ${names.map(name => `<th>${escapeHtml(name)}</th>`).join('')}
                 </tr>
               </thead>
               <tbody>
@@ -1913,11 +1913,11 @@
           const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
           const fillClass = checkedCount === MAX_PER_DAY ? 'full' : '';
 
-          html += `<tr data-date="${dateStr}">`;
+          html += `<tr data-date="${escapeHtml(dateStr)}">`;
           html += `
             <td>
               <div class="date-cell">
-                <span class="date-text">${formatDateDisplay(dateStr)}</span>
+                <span class="date-text">${escapeHtml(formatDateDisplay(dateStr))}</span>
                 <div class="progress-wrapper">
                   <span>${checkedCount}/${MAX_PER_DAY}</span>
                   <div class="progress-bar">
@@ -1940,7 +1940,7 @@
             html += `
               <td>
                 <span class="${cellClass}" 
-                      ${!isArchive ? `data-date="${dateStr}" data-name="${name}" data-checked="${checked}"` : ''}>
+                      ${!isArchive ? `data-date="${escapeHtml(dateStr)}" data-name="${escapeHtml(name)}" data-checked="${checked}"` : ''}>
                   ${display}
                 </span>
               </td>
@@ -2037,7 +2037,7 @@
           <div class="stats-card stats-total">
             <div class="name">🏆 Максимум</div>
             <span class="value">${maxVal}</span>
-            <div class="label">${maxName}</div>
+            <div class="label">${escapeHtml(maxName)}</div>
           </div>
         `;
 
@@ -2049,7 +2049,7 @@
           else if (percent >= 50) colorClass = 'yellow';
           html += `
             <div class="stats-card">
-              <div class="name">${name}</div>
+              <div class="name">${escapeHtml(name)}</div>
               <span class="value">${count}</span>
               <div class="label">дежурств</div>
               <div class="progress-bar">
@@ -2143,8 +2143,8 @@
         legendItems.forEach(item => {
           legendHTML += `
             <div class="legend-item">
-              <span class="legend-color" style="background:${item.color};"></span>
-              ${item.label} (${item.value} — ${item.percent}%)
+              <span class="legend-color" style="background:${escapeHtml(item.color)};"></span>
+              ${escapeHtml(item.label)} (${item.value} — ${item.percent}%)
             </div>
           `;
         });
@@ -2355,7 +2355,7 @@
           html += `
             <div class="repertoire-card">
               <div class="repertoire-card-header">
-                <span class="repertoire-date">${dateStr}</span>
+                <span class="repertoire-date">${escapeHtml(dateStr)}</span>
                 ${isArchive ? '<span class="repertoire-archive-badge">📦 Архив</span>' : ''}
               </div>
               <div class="repertoire-card-body">
@@ -2363,12 +2363,12 @@
                   <div class="repertoire-section-title">🎵 Песни</div>
                   ${songs.length ? songs.map(song => `
                     <div class="repertoire-song-item">
-                      <span class="song-name ${song.text ? 'has-text' : ''}" data-song="${song.name}" ${song.text ? 'style="cursor:pointer;"' : ''}>• ${song.name}</span>
+                      <span class="song-name ${song.text ? 'has-text' : ''}" data-song="${escapeHtml(song.name)}" ${song.text ? 'style="cursor:pointer;"' : ''}>• ${escapeHtml(song.name)}</span>
                       <div class="song-actions">
                         ${!isArchive && isAdmin ? `
-                          <button class="move-song-up-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вверх">↑</button>
-                          <button class="move-song-down-btn" data-date="${dateStr}" data-song="${song.name}" title="Переместить вниз">↓</button>
-                          <button class="delete-repertoire-song-btn" data-date="${dateStr}" data-song="${song.name}" title="Удалить песню">✖</button>
+                          <button class="move-song-up-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Переместить вверх">↑</button>
+                          <button class="move-song-down-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Переместить вниз">↓</button>
+                          <button class="delete-repertoire-song-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Удалить песню">✖</button>
                         ` : ''}
                       </div>
                     </div>
@@ -2378,15 +2378,15 @@
                   <div class="repertoire-section-title">🎨 Цвета</div>
                   ${colors.length ? colors.map(c => `
                     <span class="repertoire-color-item">
-                      <span class="color-dot" style="background:${c.toLowerCase()}"></span>
-                      ${c}
+                      <span class="color-dot" style="background:${escapeHtml(c.toLowerCase())}"></span>
+                      ${escapeHtml(c)}
                     </span>
                   `).join('') : '<div class="repertoire-empty">—</div>'}
                 </div>
               </div>
               ${!isArchive && isAdmin ? `
                 <div class="repertoire-card-footer">
-                  <button class="add-song-to-date-btn" data-date="${dateStr}">+ Добавить песню</button>
+                  <button class="add-song-to-date-btn" data-date="${escapeHtml(dateStr)}">+ Добавить песню</button>
                 </div>
               ` : ''}
             </div>
@@ -2534,9 +2534,9 @@
               const statusLabel = { success: '✅ success', error: '❌ error', pending: '⏳ pending' }[row.status] || row.status;
               const changed = escapeHtml(row.changes_summary || '—').replace(/\n/g, '<br>');
               html += `<tr>
-                    <td style="padding:8px; white-space:nowrap;">${formatDateTime(row.started_at)}</td>
+                    <td style="padding:8px; white-space:nowrap;">${escapeHtml(formatDateTime(row.started_at))}</td>
                     <td style="padding:8px;">${escapeHtml(row.triggered_by || 'auto')}</td>
-                    <td style="padding:8px; color:${statusColor};">${statusLabel}</td>
+                    <td style="padding:8px; color:${statusColor};">${escapeHtml(statusLabel)}</td>
                     <td style="padding:8px; vertical-align:top;">${changed}</td>
                     <td style="padding:8px; vertical-align:top;">${escapeHtml(row.details || '—')}</td>
                 </tr>`;

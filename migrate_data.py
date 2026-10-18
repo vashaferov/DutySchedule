@@ -130,6 +130,14 @@ def hash_pin(pin):
     return hashed.decode('utf-8')
 
 def clear_db(db):
+    """Стирает все данные перед импортом.
+
+    По умолчанию ВЫКЛЮЧЕНО: скрипт должен доливать недостающее, а не перезаписывать
+    живую базу. Включить явно: docker compose --profile tools run --rm -e MIGRATE_RESET=1 migrate
+    """
+    if os.getenv("MIGRATE_RESET", "").strip().lower() not in ("1", "true", "yes", "да"):
+        logger.info("MIGRATE_RESET не задан — данные не стираем, только доливаем недостающее")
+        return
     # Очищаем таблицы в правильном порядке (с учетом внешних ключей)
     db.execute(text("DELETE FROM repertoire"))
     db.execute(text("DELETE FROM date_colors"))
@@ -163,10 +171,18 @@ def migrate_users(db, sheet):
     admin_names_env = os.getenv("ADMIN_NAMES", "")
     admin_names = [name.strip() for name in admin_names_env.split(',') if name.strip()]
 
+    existing = {name for (name,) in db.query(User.name).all()}
+    added = 0
+    skipped = 0
     for row in rows[1:]:
         name = row[name_idx].strip() if len(row) > name_idx else ''
         pin = row[pin_idx].strip() if len(row) > pin_idx else ''
         if not name:
+            continue
+        # Существующих пользователей не трогаем: их PIN мог быть изменён в приложении,
+        # а перезапись «из таблицы» — тихая потеря доступа.
+        if name in existing:
+            skipped += 1
             continue
         pin_hash = hash_pin(pin) if pin else ''
         role = 'user'
@@ -179,8 +195,10 @@ def migrate_users(db, sheet):
             role = 'admin'
         user = User(name=name, pin_hash=pin_hash, role=role)
         db.add(user)
+        existing.add(name)
+        added += 1
     db.commit()
-    logger.info(f"Добавлено пользователей: {len(rows) - 1}")
+    logger.info(f"Пользователи: добавлено {added}, пропущено уже существующих {skipped}")
 
 def migrate_duty(db, sheet):
     logger.info("Миграция графика дежурств...")

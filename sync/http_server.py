@@ -4,8 +4,8 @@ import time
 import logging
 from fastapi import FastAPI, Query
 from sync import main_sync
-from models import User
-from database import SessionLocal
+from models import Base, User
+from database import SessionLocal, engine
 from passlib.context import CryptContext
 import uvicorn
 
@@ -55,6 +55,11 @@ def run_sync(admin_name: str = Query(...), admin_pin: str = Query(...)):
 
 
 if __name__ == "__main__":
+    # На пустой БД sync мог стартовать раньше api и падать с
+    # "relation ... does not exist". Создаём недостающие таблицы сами:
+    # операция идемпотентная, существующую схему не меняет.
+    Base.metadata.create_all(bind=engine)
+
     # Раньше здесь не запускался http-сервер вообще: docker-compose запускал
     # `python sync.py --http`, а sync.py этот флаг игнорировал, поэтому
     # /api/sync/run из UI всегда получал 503 (на 8001 никто не слушал).

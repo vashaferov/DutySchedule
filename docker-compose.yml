@@ -94,20 +94,34 @@ services:
       - duty_network
     restart: unless-stopped
 
-  # migrate:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.migrate
-  #   environment:
-  #     DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
-  #     SPREADSHEET_ID: ${SPREADSHEET_ID}
-  #     GOOGLE_SHEETS_CREDENTIALS: ${GOOGLE_SHEETS_CREDENTIALS}
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   networks:
-  #     - duty_network
-  #   restart: "no"
+  # Ручная утилита: импорт данных из Google Sheets (первичная заливка/восстановление).
+  #
+  # Запускается ТОЛЬКО вручную:
+  #     docker compose --profile tools run --rm migrate
+  #
+  # Сервис в профиле tools, поэтому `up -d` его НЕ запускает. Это принципиально:
+  # migrate_data.py умеет стирать таблицы (clear_db), и раньше при обычном
+  # `up -d` он выполнялся на каждом деплое. Теперь по умолчанию он только
+  # доливает недостающие записи; стирание — по MIGRATE_RESET=1.
+  migrate:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: Dockerfile.migrate
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      SPREADSHEET_ID: ${SPREADSHEET_ID}
+      GOOGLE_SHEETS_CREDENTIALS: ${GOOGLE_SHEETS_CREDENTIALS}
+      # Имена, которых нет в колонке «Роль», но которые должны стать админами.
+      ADMIN_NAMES: ${ADMIN_NAMES:-}
+      # Стирание таблиц перед импортом включается только явно, при запуске:
+      #   docker compose --profile tools run --rm -e MIGRATE_RESET=1 migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - duty_network
+    restart: "no"
 
 networks:
   duty_network:

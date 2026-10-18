@@ -98,6 +98,35 @@ def test_create_date_rejects_bad_format(client, db):
     assert resp.status_code == 400
 
 
+def test_create_date_rejects_html_in_note(client, db):
+    """Примечание к дате — это был вектор stored XSS, HTML туда проходить не должен."""
+    _make_admin(db, "date_admin_xss")
+    payloads = [
+        "10.10.2032 (<img src=x onerror=alert(1)>)",
+        '10.10.2032 (" onmouseover="alert(1))',
+        "10.10.2032 (<script>alert(1)</script>)",
+        "10.10.2032 (а/b)",
+        "10.10.2032 (а&б)",
+    ]
+    for date_str in payloads:
+        resp = client.post("/api/duty/dates", json={
+            "date_str": date_str, "changer": "date_admin_xss", "pin": "1234"})
+        assert resp.status_code == 400, date_str
+
+    dates = client.get("/api/duty/matrix").json()["dates"]
+    assert not any("<" in d or ">" in d for d in dates)
+
+
+def test_create_date_accepts_safe_note_chars(client, db):
+    """Обычные примечания (запятые, двоеточия, тире, №) по-прежнему принимаются."""
+    _make_admin(db, "date_admin_ok_note")
+    resp = client.post("/api/duty/dates", json={
+        "date_str": " 10.10.2033 (вечер, 18:00-20:00 — по заявке №5) ",
+        "changer": "date_admin_ok_note", "pin": "1234"})
+    assert resp.status_code == 200
+    assert resp.json()["date_str"] == "10.10.2033 (вечер, 18:00-20:00 — по заявке №5)"
+
+
 def test_create_date_rejects_duplicate(client, db):
     _make_admin(db, "date_admin_dup")
     payload = {"date_str": "12.10.2030", "changer": "date_admin_dup", "pin": "1234"}

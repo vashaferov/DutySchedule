@@ -30,6 +30,14 @@ jobs:
         run: |
           pytest api/tests -v
 
+      # Регрессия на stored XSS: проверяет, что функции рендера из frontend/index.html
+      # экранируют данные из БД. Node предустановлен на раннерах GitHub.
+      - name: Frontend XSS checks
+        run: node tests/frontend/xss.test.js
+
+      - name: Bash syntax checks
+        run: bash -n scripts/backup-db.sh scripts/restore-db.sh
+
   deploy:
     needs: test
     runs-on: ubuntu-latest
@@ -105,14 +113,52 @@ jobs:
             echo "Starting containers..."
             $DOCKER_COMPOSE up -d --force-recreate --build --remove-orphans
 
-            # Проверка, инициализирована ли БД (есть ли таблица users)
-            echo "Checking if database is initialized..."
-            if $DOCKER_COMPOSE exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -c "SELECT 1 FROM users LIMIT 1;" &>/dev/null; then
-                echo "⏭️ База данных уже инициализирована, миграция не требуется."
+            # Ждём, пока API поднимется: схему БД создаёт он сам (create_all в main.py),
+            # поэтому раньше, чем отвечает /api/health, проверять таблицы бессмысленно.
+            echo "Waiting for API to become healthy..."
+            api_ready=0
+            for i in $(seq 1 30); do
+                if $DOCKER_COMPOSE exec -T api python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2).status == 200 else 1)" &>/dev/null; then
+                    api_ready=1
+                    echo "✅ API отвечает"
+                    break
+                fi
+                sleep 2
+            done
+            if [ "$api_ready" != "1" ]; then
+                echo "❌ API не поднялся за 60 секунд. Логи: $DOCKER_COMPOSE logs --tail=50 api"
+                exit 1
+            fi
+
+            # Проверяем, есть ли в базе пользователи (таблицы к этому моменту уже созданы).
+            # ВАЖНО: ничего не стираем и не мигрируем автоматически — импорт из Google
+            # Sheets перезаписывает данные, это ручное осознанное действие.
+            users_count=$($DOCKER_COMPOSE exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -tAc "SELECT count(*) FROM users;" 2>/dev/null | tr -d '[:space:]')
+            if [ "$users_count" = "0" ] || [ -z "$users_count" ]; then
+                echo "⚠️  База пустая: пользователей нет, войти в приложение некому."
+                echo "   Залить данные из Google Sheets (может стереть текущее — см. RUNBOOK.md):"
+                echo "     cd ~/duty && docker compose --profile tools run --rm migrate"
+                echo "   Восстановить из бэкапа: см. RUNBOOK.md"
             else
-                echo "🔄 Запускаем миграцию данных..."
-                $DOCKER_COMPOSE run --rm migrate
-                echo "✅ Миграция завершена"
+                echo "✅ База инициализирована, пользователей: $users_count"
+            fi
+
+            # Бэкапы БД: ставим/обновляем ежедневный cron. Без бэкапов потеря
+            # диска = потеря всех данных. Как восстановиться — RUNBOOK.md.
+            BACKUP_DIR="$HOME/duty-backups"
+            mkdir -p "$BACKUP_DIR"
+            if command -v crontab &>/dev/null && [ -f "$HOME/duty/scripts/backup-db.sh" ]; then
+                chmod +x "$HOME/duty/scripts/backup-db.sh"
+                # Перезаписываем только свою строку, чужие задачи пользователя не трогаем.
+                {
+                    crontab -l 2>/dev/null | grep -v 'scripts/backup-db.sh' || true
+                    echo "15 3 * * * ENV_FILE=$HOME/duty/.env BACKUP_DIR=$BACKUP_DIR $HOME/duty/scripts/backup-db.sh >> $BACKUP_DIR/backup.log 2>&1"
+                } > /tmp/duty-crontab.$$
+                crontab /tmp/duty-crontab.$$
+                rm -f /tmp/duty-crontab.$$
+                echo "✅ Бэкапы: ежедневно в 03:15, каталог $BACKUP_DIR, храним 14 дней"
+            else
+                echo "⚠️  Бэкапы НЕ настроены (нет crontab или scripts/backup-db.sh) — см. RUNBOOK.md"
             fi
 
             echo "✅ Deployment completed successfully."

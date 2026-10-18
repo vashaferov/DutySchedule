@@ -6,8 +6,11 @@ from .. import crud, schemas
 
 router = APIRouter()
 
-# "10.10.2026" или "10.10.2026 (утро 10-12)"
-DATE_STR_RE = re.compile(r'^\d{2}\.\d{2}\.\d{4}(\s*\(.+\))?$')
+# "10.10.2026" или "10.10.2026 (утро 10-12)".
+# В примечании запрещены символы, которыми можно разметить HTML, сломать URL-путь
+# или подсунуть управляющие последовательности. Экранирование на выводе — основная
+# защита, это лишь дополнительный барьер (и заодно запрет мусорных дат).
+DATE_STR_RE = re.compile(r'^\d{2}\.\d{2}\.\d{4}(\s*\([^<>"\'`&/\\#?\x00-\x1f]+\))?$')
 
 
 def normalize_date_str(raw: str) -> str:
@@ -37,7 +40,8 @@ def create_date(req: schemas.DutyDateCreateRequest, db: Session = Depends(get_db
     if not DATE_STR_RE.match(date_str):
         raise HTTPException(
             status_code=400,
-            detail="Формат даты: ДД.ММ.ГГГГ (пояснение в скобках — по желанию)",
+            detail='Формат даты: ДД.ММ.ГГГГ (пояснение в скобках). '
+                   'В пояснении нельзя символы < > " \' & / # ?',
         )
     try:
         crud.create_date(db, date_str)
