@@ -74,3 +74,29 @@ def test_sync_history(client, admin_user, db):
     assert len(data) > 0
     assert data[0]["triggered_by"] == "sync_admin_test"
     assert data[0]["status"] == "success"
+
+
+def test_sync_history_timestamps_are_utc(client, admin_user, db):
+    """Время отдаётся с явным смещением UTC, чтобы клиент перевёл его в пояс пользователя."""
+    from datetime import datetime, timedelta
+    from app.models import SyncHistory
+
+    db.add(SyncHistory(
+        triggered_by="sync_admin_test",
+        changes_summary="Проверка часового пояса",
+        status="success",
+    ))
+    db.commit()
+
+    response = client.get(
+        "/api/sync/history?admin_name=sync_admin_test&admin_pin=1234&limit=10"
+    )
+    assert response.status_code == 200
+
+    started = response.json()[0]["started_at"]
+    assert started is not None
+    assert started.endswith("+00:00"), started
+
+    parsed = datetime.fromisoformat(started)
+    assert parsed.tzinfo is not None
+    assert parsed.utcoffset() == timedelta(0)

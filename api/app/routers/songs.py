@@ -14,8 +14,11 @@ def create_song(song: schemas.SongCreate, changer: str = Query(...), pin: str = 
     if not crud.verify_pin(db, changer, pin) or not crud.is_admin(db, changer):
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
-        crud.set_sync_flag(db, True, changer)
-        return crud.create_song(db, song)
+        created = crud.create_song(db, song)
+        crud.set_sync_flag(db, True, changer, f"добавлена песня «{created.name}»")
+        # Явный словарь: set_sync_flag коммитит и «протухает» ORM-объект,
+        # из-за чего FastAPI сериализовал бы пустой __dict__.
+        return {"id": created.id, "name": created.name, "text": created.text}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -25,7 +28,7 @@ def update_song_text(name: str, new_text: str = Query(...), changer: str = Query
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
         song = crud.update_song_text(db, name, new_text)
-        crud.set_sync_flag(db, True, changer)
+        crud.set_sync_flag(db, True, changer, f"изменён текст песни «{name}»")
         return {"success": True, "song": schemas.SongResponse.model_validate(song)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -36,7 +39,7 @@ def delete_song(name: str, changer: str = Query(...), pin: str = Query(...), db:
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
         crud.delete_song(db, name)
-        crud.set_sync_flag(db, True, changer)
+        crud.set_sync_flag(db, True, changer, f"удалена песня «{name}»")
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

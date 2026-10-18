@@ -1,4 +1,6 @@
+import json
 import bcrypt
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from . import models, schemas
@@ -34,6 +36,17 @@ def get_or_create_date(db: Session, date_str: str):
 
 def get_all_dates(db: Session):
     return db.query(models.DutyDate).order_by(models.DutyDate.date_str).all()
+
+def create_date(db: Session, date_str: str):
+    """Создать новую пустую дату. Даты в графике заводятся вручную админом."""
+    existing = db.query(models.DutyDate).filter(models.DutyDate.date_str == date_str).first()
+    if existing:
+        raise ValueError("Такая дата уже есть")
+    date = models.DutyDate(date_str=date_str)
+    db.add(date)
+    db.commit()
+    db.refresh(date)
+    return date
 
 def toggle_duty(db: Session, date_str: str, user_name: str, value: bool):
     date = get_or_create_date(db, date_str)
@@ -174,7 +187,50 @@ def update_repertoire_for_date(db: Session, date_str: str, song_names: list):
     db.commit()
 
     # ---------- Sync History ----------
-def set_sync_flag(db: Session, needs_sync: bool = True, triggered_by: str = 'auto'):
+PENDING_CHANGES_KEY = 'pending_changes'
+
+
+def _read_pending_changes(db: Session) -> list:
+    row = db.query(models.SyncMetadata).filter(models.SyncMetadata.key == PENDING_CHANGES_KEY).first()
+    if not row or not row.value:
+        return []
+    try:
+        data = json.loads(row.value)
+    except (ValueError, TypeError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def get_pending_changes(db: Session) -> list:
+    """Список правок, накопившихся с прошлой синхронизации (что её вызовет)."""
+    return _read_pending_changes(db)
+
+
+def add_pending_change(db: Session, triggered_by: str, text: str):
+    changes = _read_pending_changes(db)
+    changes.append({
+        "by": triggered_by or 'auto',
+        "text": text,
+        "at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    })
+    row = db.query(models.SyncMetadata).filter(models.SyncMetadata.key == PENDING_CHANGES_KEY).first()
+    if not row:
+        row = models.SyncMetadata(key=PENDING_CHANGES_KEY, value='')
+        db.add(row)
+    row.value = json.dumps(changes, ensure_ascii=False)
+    row.updated_at = func.now()
+    db.commit()
+
+
+def clear_pending_changes(db: Session):
+    row = db.query(models.SyncMetadata).filter(models.SyncMetadata.key == PENDING_CHANGES_KEY).first()
+    if row:
+        row.value = '[]'
+        row.updated_at = func.now()
+        db.commit()
+
+
+def set_sync_flag(db: Session, needs_sync: bool = True, triggered_by: str = 'auto', change: str = None):
     row = db.query(models.SyncMetadata).filter(models.SyncMetadata.key == 'sync_flag').first()
     if not row:
         row = models.SyncMetadata(key='sync_flag', value='')
@@ -182,6 +238,9 @@ def set_sync_flag(db: Session, needs_sync: bool = True, triggered_by: str = 'aut
     row.value = str(needs_sync)
     row.updated_at = func.now()
     db.commit()
+    # Журнал правок: попадёт в историю синхронизации как «что изменилось».
+    if needs_sync and change:
+        add_pending_change(db, triggered_by, change)
 
 def get_sync_flag(db: Session) -> bool:
     row = db.query(models.SyncMetadata).filter(models.SyncMetadata.key == 'sync_flag').first()

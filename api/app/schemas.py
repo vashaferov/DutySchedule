@@ -1,4 +1,5 @@
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime, timezone
+from pydantic import BaseModel, ConfigDict, field_serializer
 from typing import List, Optional, Dict
 
 
@@ -39,6 +40,13 @@ class DutyToggleRequest(BaseModel):
     date_str: str
     user_name: str
     value: bool
+    changer: str
+    pin: str
+
+
+class DutyDateCreateRequest(BaseModel):
+    # Свободный формат: "10.10.2026" или "10.10.2026 (утро 10-12)"
+    date_str: str
     changer: str
     pin: str
 
@@ -112,3 +120,28 @@ class UserNamesResponse(BaseModel):
 
 class UsersListResponse(BaseModel):
     users: List[UserResponse]
+
+
+# ----- Sync history -----
+class SyncHistoryResponse(BaseModel):
+    """
+    Метки времени в БД хранятся в UTC (контейнер Postgres без TZ => now() в UTC).
+    Отдаём их с явным смещением (+00:00) — браузер сам переведёт в часовой пояс пользователя.
+    """
+    id: int
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    status: Optional[str] = None
+    details: Optional[str] = None
+    triggered_by: Optional[str] = None
+    changes_summary: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("started_at", "finished_at")
+    def serialize_utc(self, value: Optional[datetime]):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()

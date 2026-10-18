@@ -189,6 +189,39 @@ def update_sync_history(db, history_id, status, details=None):
 # -------------------------------------------------
 
 
+# ---------- Что изменилось с прошлой синхронизации ----------
+PENDING_CHANGES_KEY = 'pending_changes'
+
+
+def get_pending_changes(db):
+    row = db.query(SyncMetadata).filter(SyncMetadata.key == PENDING_CHANGES_KEY).first()
+    if not row or not row.value:
+        return []
+    try:
+        data = json.loads(row.value)
+    except (ValueError, TypeError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def clear_pending_changes(db):
+    row = db.query(SyncMetadata).filter(SyncMetadata.key == PENDING_CHANGES_KEY).first()
+    if row:
+        row.value = '[]'
+        db.commit()
+
+
+def build_changes_summary(changes):
+    """«Кто: что» построчно — это и есть ответ на «что вызвало синхронизацию»."""
+    if not changes:
+        return 'auto', 'Правки не детализированы (флаг синхронизации выставлен без журнала изменений)'
+    authors = sorted({(c.get('by') or 'auto') for c in changes})
+    triggered_by = ', '.join(authors)[:100]
+    summary = '\n'.join(f"{c.get('by') or 'auto'}: {c.get('text') or ''}" for c in changes)
+    return triggered_by, summary
+# -------------------------------------------------
+
+
 def main_sync():
     db = SessionLocal()
     try:
@@ -197,8 +230,8 @@ def main_sync():
             logger.info("No sync needed")
             return
 
-        triggered_by = 'auto'
-        changes_summary = 'Scheduled sync'
+        changes = get_pending_changes(db)
+        triggered_by, changes_summary = build_changes_summary(changes)
 
         history_id = create_sync_history(db, triggered_by, changes_summary)
         try:
@@ -206,6 +239,7 @@ def main_sync():
             sync_repertoire(db)
             flag_row.value = 'false'
             db.commit()
+            clear_pending_changes(db)
             update_sync_history(db, history_id, 'success', 'Sync completed successfully')
             logger.info("Sync completed successfully")
         except Exception as e:

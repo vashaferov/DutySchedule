@@ -57,6 +57,9 @@
         <div class="section-title">
           🟢 Актуальные даты
           <span class="count" id="main-count"></span>
+          <button id="add-date-btn"
+            style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">➕
+            Добавить дату</button>
         </div>
         <div id="main-table-container"></div>
         <div id="main-pagination" class="pagination"></div>
@@ -314,6 +317,27 @@
       </div>
     </div>
 
+    <div id="add-date-modal" class="modal-overlay">
+      <div class="modal-content small">
+        <div class="modal-header">
+          <h3>➕ Добавить дату</h3>
+          <button class="modal-close-btn" id="add-date-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:8px;">
+            Формат: <strong>ДД.ММ.ГГГГ</strong>. По желанию можно дописать пояснение в скобках.
+          </p>
+          <input type="text" id="add-date-input" placeholder="10.10.2026 (утро 10-12)" class="modal-input"
+            autocomplete="off">
+          <div id="add-date-error" class="modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="add-date-cancel">Отмена</button>
+          <button class="btn-primary" id="add-date-confirm">Добавить</button>
+        </div>
+      </div>
+    </div>
+
     <div id="sync-history-modal" class="modal-overlay">
       <div class="modal-content wide">
         <div class="modal-header">
@@ -376,6 +400,31 @@
         setTimeout(() => {
           if (toast.parentNode) toast.remove();
         }, duration);
+      }
+
+      // ---------- Экранирование HTML ----------
+      function escapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // ---------- Дата/время в часовом поясе пользователя ----------
+      function formatDateTime(value) {
+        if (!value) return '—';
+        // Сервер отдаёт время в UTC. Если смещение не указано — считаем его UTC,
+        // иначе браузер принял бы его за локальное время пользователя.
+        const naive = typeof value === 'string' &&
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value);
+        const d = new Date(naive ? value + 'Z' : value);
+        if (isNaN(d.getTime())) return String(value);
+        return d.toLocaleString(undefined, {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          timeZoneName: 'short'
+        });
       }
 
       // ---------- Глобальный индикатор загрузки ----------
@@ -506,6 +555,13 @@
           songsBtn.style.display = 'inline-block';
         } else {
           songsBtn.style.display = 'none';
+        }
+
+        const addDateBtn = document.getElementById('add-date-btn');
+        if (currentUser && isAdmin) {
+          addDateBtn.style.display = 'inline-block';
+        } else {
+          addDateBtn.style.display = 'none';
         }
       }
 
@@ -917,6 +973,61 @@
           showNotification('Синхронизация запущена успешно!', 'success');
         } catch (e) {
           showNotification('Ошибка: ' + e.message, 'error');
+        } finally {
+          hideGlobalLoader();
+        }
+      });
+
+      // ---------- Добавление новой даты (админ) ----------
+      function openAddDateModal() {
+        if (!isAdmin) return;
+        const input = document.getElementById('add-date-input');
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        input.value = `${dd}.${mm}.${now.getFullYear()}`;
+        const errEl = document.getElementById('add-date-error');
+        errEl.textContent = '';
+        errEl.style.display = 'none';
+        document.getElementById('add-date-modal').style.display = 'flex';
+        input.focus();
+      }
+
+      function closeAddDateModal() {
+        document.getElementById('add-date-modal').style.display = 'none';
+      }
+
+      document.getElementById('add-date-btn').addEventListener('click', openAddDateModal);
+      document.getElementById('add-date-close').addEventListener('click', closeAddDateModal);
+      document.getElementById('add-date-cancel').addEventListener('click', closeAddDateModal);
+
+      document.getElementById('add-date-confirm').addEventListener('click', async function () {
+        const input = document.getElementById('add-date-input');
+        const errEl = document.getElementById('add-date-error');
+        const dateStr = input.value.trim().replace(/\s+/g, ' ');
+
+        if (!/^\d{2}\.\d{2}\.\d{4}(\s*\(.+\))?$/.test(dateStr)) {
+          errEl.textContent = 'Формат: ДД.ММ.ГГГГ (пояснение в скобках — по желанию)';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        try {
+          showGlobalLoader();
+          const resp = await fetch(`${API_URL}/duty/dates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date_str: dateStr, changer: currentUser, pin: currentPin })
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || 'Ошибка добавления даты');
+          closeAddDateModal();
+          await refreshDutyData();
+          await refreshRepertoire();
+          showNotification('Дата добавлена', 'success');
+        } catch (e) {
+          errEl.textContent = e.message;
+          errEl.style.display = 'block';
         } finally {
           hideGlobalLoader();
         }
@@ -1728,7 +1839,9 @@
           container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Архив пуст.</p>';
           return;
         }
-        container.innerHTML = buildCardsHTML(pastDates, true);
+        // Админу архив доступен на редактирование (только дежурные), остальным — только чтение.
+        container.innerHTML = buildCardsHTML(pastDates, !isAdmin);
+        if (isAdmin) attachCardEvents();
       }
 
       // ---------- Построение HTML таблицы (без изменений) ----------
@@ -2367,15 +2480,19 @@
                     <th style="text-align:left; padding:8px;">Дата</th>
                     <th style="text-align:left; padding:8px;">Кто</th>
                     <th style="text-align:left; padding:8px;">Статус</th>
-                    <th style="text-align:left; padding:8px;">Детали</th>
+                    <th style="text-align:left; padding:8px;">Что изменилось</th>
+                    <th style="text-align:left; padding:8px;">Результат</th>
                 </tr></thead><tbody>`;
             data.forEach(row => {
               const statusColor = row.status === 'success' ? 'green' : row.status === 'error' ? 'red' : 'orange';
+              const statusLabel = { success: '✅ success', error: '❌ error', pending: '⏳ pending' }[row.status] || row.status;
+              const changed = escapeHtml(row.changes_summary || '—').replace(/\n/g, '<br>');
               html += `<tr>
-                    <td style="padding:8px;">${new Date(row.started_at).toLocaleString()}</td>
-                    <td style="padding:8px;">${row.triggered_by || 'auto'}</td>
-                    <td style="padding:8px; color:${statusColor};">${row.status}</td>
-                    <td style="padding:8px;">${row.details || row.changes_summary || '—'}</td>
+                    <td style="padding:8px; white-space:nowrap;">${formatDateTime(row.started_at)}</td>
+                    <td style="padding:8px;">${escapeHtml(row.triggered_by || 'auto')}</td>
+                    <td style="padding:8px; color:${statusColor};">${statusLabel}</td>
+                    <td style="padding:8px; vertical-align:top;">${changed}</td>
+                    <td style="padding:8px; vertical-align:top;">${escapeHtml(row.details || '—')}</td>
                 </tr>`;
             });
             html += '</tbody></table>';
