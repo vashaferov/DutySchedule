@@ -49,6 +49,8 @@ OUT="${OUT:-/root/incident-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$OUT" && chmod 700 "$OUT"
 
 # Диапазон для journalctl (и, при необходимости, для docker logs --since).
+# FROM/TO обязательно экспортируем: их подставляет `bash -c` внутри collect_shell.
+export FROM TO
 JARGS=()
 [ -n "$FROM" ] && JARGS+=(--since "$FROM")
 [ -n "$TO" ]   && JARGS+=(--until "$TO")
@@ -124,7 +126,14 @@ awk -F: "\$2 !~ /^[*!]*$/ {print \$1}" /etc/shadow 2>/dev/null
 echo "--- файл sudo/ssh конфигов ---"
 ls -la /etc/sudoers /etc/sudoers.d 2>/dev/null
 '
-collect 02-logins.txt "Последние входы" last -a -F
+collect_shell 02-logins.txt "Последние входы (last)" '
+if command -v last >/dev/null 2>&1; then
+  last -a -F | head -100
+else
+  echo "команда last не установлена (в Debian 13 она в пакете wtmpdb)."
+  echo "Источник входов — journalctl, см. 03-journal-ssh.txt."
+fi
+'
 collect_shell 02-logins-failed.txt "Неудачные входы" 'lastb -a 2>/dev/null | head -100'
 collect 02-logins-online.txt "Кто сейчас в системе" who -a
 
@@ -140,13 +149,20 @@ collect_journal 03-journal-ssh.txt "journalctl: sshd / sudo / login за окн�
 collect_journal 03-journal-root.txt "journalctl: действия root за окно" _UID=0
 
 # ------------------------------------------------------------- 3. SSH и доступ
-collect_shell 04-ssh-keys.txt "authorized_keys по всем пользователям" '
-while IFS=: read -r u _ uid _ _ home shell; do
-  [ "$uid" -ge 0 ] 2>/dev/null || continue
-  for k in "$home/.ssh/authorized_keys" /root/.ssh/authorized_keys; do
-    [ -f "$k" ] && { echo "### $k"; cat "$k"; echo; }
-  done
-done < /etc/passwd
+collect_shell 04-ssh-keys.txt "authorized_keys: файлы, mtime, отпечатки ключей" '
+for k in /root/.ssh/authorized_keys /root/.ssh/authorized_keys2 \
+         /home/*/.ssh/authorized_keys /home/*/.ssh/authorized_keys2; do
+  [ -f "$k" ] || continue
+  echo "### $k"
+  stat -c "    mtime=%y mode=%a owner=%U" "$k" 2>/dev/null
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in \#*) echo "    $line"; continue ;; esac
+    # печатаем только отпечаток и комментарий, без самого ключа
+    echo "    $(printf "%s\n" "$line" | ssh-keygen -lf - 2>/dev/null | awk "{print \$1, \$2, \$3, \$4}")"
+  done < "$k"
+  echo
+done
 '
 collect_shell 04-ssh-config.txt "Эффективный конфиг sshd" 'sshd -T 2>/dev/null | grep -Ei "^(port|permitrootlogin|passwordauthentication|pubkeyauthentication|authorizedkeysfile|allowusers|permitemptypasswords)" || cat /etc/ssh/sshd_config'
 collect_shell 04-ssh-hostkeys.txt "Ключи хоста SSH (даты создания)" 'ls -la --time-style=long-iso /etc/ssh/ssh_host_* 2>/dev/null'
@@ -175,7 +191,7 @@ echo "--- запущенные ---"
 systemctl list-units --state=running --type=service --no-pager 2>/dev/null | head -100
 '
 collect_shell 07-recent-units.txt "Unit-файлы, изменённые в окне инцидента" '
-find /etc/systemd /lib/systemd /usr/lib/systemd -name "*.service" -newermt "${FROM:-now -7 days}" -type f -exec ls -la --time-style=long-iso {} \; 2>/dev/null | head -100
+find /etc/systemd /lib/systemd /usr/lib/systemd -name "*.service" -newermt "${FROM:-now -7 days}" -type f -printf "%TY-%Tm-%Td %TH:%TM  %p\n" 2>/dev/null | sort | head -100
 '
 
 # ----------------------------------------------------------------- 7. Docker
@@ -211,15 +227,28 @@ find /var/lib/docker/containers -name "*-json.log" 2>/dev/null | while read -r f
   grep -Ei "\.(env|git|ssh)|authorized_keys|wp-login|phpmyadmin|base64|etc/passwd" "$f" | tail -50
 done
 '
+collect_shell 09-host-nginx-logs.txt "Логи хостового nginx (вкл. ротацию) — единственный источник за окно" '
+echo "--- файлы логов ---"
+ls -la --time-style=long-iso /var/log/nginx/ 2>/dev/null
+echo "--- содержимое (последние 2000 строк каждого) ---"
+for f in /var/log/nginx/access.log /var/log/nginx/access.log.*; do
+  [ -f "$f" ] || continue
+  echo "##### $f"
+  case "$f" in
+    *.gz) zcat "$f" 2>/dev/null ;;
+    *)    cat  "$f" 2>/dev/null ;;
+  esac | tail -2000
+done
+'
 collect_shell 09-pins-in-logs.txt "ВНИМАНИЕ: PIN в логах (query-параметры)" '
 echo "Найдены запросы с pin= : файлы ниже содержат PIN в открытом виде."
 echo "Обращаться как с секретом. НЕ выкладывать в тикеты и репозитории."
 find /var/log -name "access.log*" 2>/dev/null | while read -r f; do
-  n=$(grep -c "pin=" "$f" 2>/dev/null || echo 0)
+  n=$(grep -c "pin=" "$f" 2>/dev/null || true); n=${n:-0}
   [ "$n" -gt 0 ] && echo "$f : $n совпадений"
 done
 find /var/lib/docker/containers -name "*-json.log" 2>/dev/null | while read -r f; do
-  n=$(grep -c "pin=" "$f" 2>/dev/null || echo 0)
+  n=$(grep -c "pin=" "$f" 2>/dev/null || true); n=${n:-0}
   [ "$n" -gt 0 ] && echo "$f : $n совпадений"
 done
 '
@@ -240,7 +269,8 @@ find /tmp /dev/shm /var/tmp -type f -executable 2>/dev/null | head -50
 # ------------------------------------------------------ 10. Изменённые файлы
 collect_shell 11-recent-files.txt "Файлы, изменённые в окне инцидента" '
 find /etc /root /home /opt /usr/local -xdev -type f \
-  -newermt "${FROM:-now -7 days}" ! -newermt "${TO:-now}" 2>/dev/null | head -300
+  -newermt "${FROM:-now -7 days}" ! -newermt "${TO:-now}" \
+  -printf "%TY-%Tm-%Td %TH:%TM  %p\n" 2>/dev/null | sort | head -300
 '
 collect_shell 11-suid.txt "SUID/SGID-файлы" 'find / -xdev \( -perm -4000 -o -perm -2000 \) -type f 2>/dev/null'
 collect_shell 11-ld-preload.txt "Подмена библиотек (ld.so)" '

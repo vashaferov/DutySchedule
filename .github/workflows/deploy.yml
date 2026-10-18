@@ -103,7 +103,7 @@ jobs:
             $DOCKER_COMPOSE pull
 
             echo "Starting containers..."
-            $DOCKER_COMPOSE up -d --force-recreate --build
+            $DOCKER_COMPOSE up -d --force-recreate --build --remove-orphans
 
             # Проверка, инициализирована ли БД (есть ли таблица users)
             echo "Checking if database is initialized..."
