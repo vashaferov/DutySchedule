@@ -67,7 +67,9 @@ services:
     # Файл sync/credentials.json остаётся только фолбэком для локального запуска.
     ports:
       - "127.0.0.1:8001:8001"   # доступен только локально
-    command: ["python", "sync.py", "--http"]
+    # http_server.py поднимает и фоновый автосинк (поток), и ручку POST /run,
+    # которую дёргает /api/sync/run из UI.
+    command: ["python", "http_server.py"]
 
   # Прокси Nginx (отдаёт статику и проксирует API)
   nginx:
