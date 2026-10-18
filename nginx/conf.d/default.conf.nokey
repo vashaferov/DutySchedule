@@ -29,6 +29,18 @@ server {
         root /usr/share/nginx/html;
         index index.html;
         try_files $uri $uri/ /index.html;
+
+        # После деплоя фронтенд и API обновляются вместе, поэтому закэшированный
+        # index.html звал бы ручки, которых уже нет (и наоборот). no-cache не
+        # запрещает кэш, а заставляет браузер сверяться с ETag: 304 почти
+        # бесплатен, зато после деплоя страница всегда актуальна.
+        add_header Cache-Control "no-cache";
+
+        # Запреты, которые приложению не мешают: встраивание в чужой iframe,
+        # плагины, подмена <base>. Скрипты и стили намеренно не ограничиваем —
+        # в index.html есть инлайновый <script>, ему нужен 'unsafe-inline'.
+        add_header Content-Security-Policy "frame-ancestors 'none'; object-src 'none'; base-uri 'self'" always;
+        add_header X-Content-Type-Options "nosniff" always;
     }
 
     # Прокси на API (важно!)
