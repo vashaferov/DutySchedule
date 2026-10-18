@@ -45,6 +45,13 @@ jobs:
       - name: Backup cron installer test
         run: bash tests/scripts/install-backup-cron.test.sh
 
+      # Прогон самого скрипта деплоя: ssh-action со script_stop переписывает
+      # его (вставляет проверки кода возврата), и часть конструкций из-за этого
+      # ломается — так падали деплои 85de881 (ветка else) и a7b6b9c (case).
+      # Здесь это воспроизводится локально, с заглушками вместо git/docker.
+      - name: Deploy script simulation
+        run: bash tests/scripts/deploy-simulation.test.sh
+
   deploy:
     needs: test
     runs-on: ubuntu-latest
@@ -69,12 +76,25 @@ jobs:
 
             git --version || { echo "❌ Git not installed!"; exit 1; }
 
-            # Определяем команду Docker Compose
+            # Определяем команду Docker Compose.
+            # ВАЖНО (проверено на деплоях 85de881 и a7b6b9c): ssh-action со
+            # script_stop режет скрипт на строки и после каждой вставляет
+            #   DRONE_SSH_PREV_COMMAND_EXIT_CODE=$? ; if [ $... -ne 0 ]; then exit $...; fi;
+            # Из-за этого в этом файле нельзя:
+            #   * case — вставка ломает разбор: "syntax error near `;'";
+            #   * else — вставка идёт первой строкой ветки и видит код 1 от
+            #     ложного условия, после чего завершает деплой.
+            # Поэтому вместо if/else — цепочки простых if.
+            DOCKER_COMPOSE=""
             if command -v docker-compose &> /dev/null; then
                 DOCKER_COMPOSE="docker-compose"
-            elif docker compose version &> /dev/null 2>&1; then
-                DOCKER_COMPOSE="docker compose"
-            else
+            fi
+            if [ -z "$DOCKER_COMPOSE" ]; then
+                if docker compose version &> /dev/null 2>&1; then
+                    DOCKER_COMPOSE="docker compose"
+                fi
+            fi
+            if [ -z "$DOCKER_COMPOSE" ]; then
                 echo "❌ Neither docker-compose nor docker compose found!"
                 exit 1
             fi
@@ -83,12 +103,14 @@ jobs:
             mkdir -p ~/duty
             cd ~/duty
 
-            # Клонируем или обновляем код
+            # Клонируем или обновляем код. Вместо if/else — два независимых if:
+            # ветка else в этом скрипте обрывает деплой (см. пояснение ниже).
             set +e
             if [ -d .git ]; then
                 echo "Pulling latest changes..."
                 git pull
-            else
+            fi
+            if [ ! -d .git ]; then
                 echo "Cloning repository..."
                 rm -rf ./* 2>/dev/null
                 git clone https://github.com/${{ github.repository }} .
@@ -104,28 +126,18 @@ jobs:
             echo "Creating .env file..."
             umask 077
 
-            # Ключ подписи токенов. Если JWT_SECRET не задан в секретах GitHub —
-            # берём прежний из .env, иначе генерируем. Пустой ключ означал бы,
-            # что все токены умирают при каждом перезапуске API.
-            #
-            # Проверки оформлены через case, а не через if [ ... ] || [ ... ]:
-            # appleboy/ssh-action со script_stop: true обрывает деплой на ЛЮБОМ
-            # ненулевом коде команды, включая проверку внутри условия, которая
-            # законно вернула 1 (так и упал деплой 85de881).
+            # Ключ подписи токенов. Деплой гарантирует непустое значение: с пустым
+            # ключом все токены умирают при каждом перезапуске API.
+            # Про ограничения этого файла (только if без else и без case) — выше.
             JWT_SECRET_VALUE="${{ secrets.JWT_SECRET }}"
-            case "$JWT_SECRET_VALUE" in
-                "")
-                    # Прежний ключ из .env: нужен, чтобы он не менялся от деплоя
-                    # к деплою (иначе все выданные токены умирают).
-                    JWT_SECRET_VALUE=$(sed -n 's/^JWT_SECRET=//p' ~/duty/.env 2>/dev/null | head -n1)
-                    ;;
-            esac
-            case "$JWT_SECRET_VALUE" in
-                "")
-                    JWT_SECRET_VALUE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
-                    echo "⚠️  JWT_SECRET не задан в секретах GitHub — сгенерирован и сохранён в ~/duty/.env"
-                    ;;
-            esac
+            if [ -z "$JWT_SECRET_VALUE" ]; then
+                # Прежний ключ из .env: он не должен меняться от деплоя к деплою.
+                JWT_SECRET_VALUE=$(sed -n 's/^JWT_SECRET=//p' ~/duty/.env 2>/dev/null | head -n1)
+            fi
+            if [ -z "$JWT_SECRET_VALUE" ]; then
+                JWT_SECRET_VALUE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+                echo "⚠️  JWT_SECRET не задан в секретах GitHub — сгенерирован и сохранён в ~/duty/.env"
+            fi
 
             cat > ~/duty/.env << EOF
             DB_NAME=${{ secrets.DB_NAME }}
@@ -164,20 +176,21 @@ jobs:
             # Проверяем, есть ли в базе пользователи (таблицы к этому моменту уже созданы).
             # ВАЖНО: ничего не стираем и не мигрируем автоматически — импорт из Google
             # Sheets перезаписывает данные, это ручное осознанное действие.
-            # case, а не if [ ... ] || [ ... ]: см. пояснение выше про script_stop
-            # (именно эта проверка и оборвала предыдущий деплой).
             users_count=$($DOCKER_COMPOSE exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -tAc "SELECT count(*) FROM users;" 2>/dev/null | tr -d '[:space:]')
-            case "$users_count" in
-                0|"")
-                    echo "⚠️  База пустая: пользователей нет, войти в приложение некому."
-                    echo "   Залить данные из Google Sheets (может стереть текущее — см. RUNBOOK.md):"
-                    echo "     cd ~/duty && docker compose --profile tools run --rm migrate"
-                    echo "   Восстановить из бэкапа: см. RUNBOOK.md"
-                    ;;
-                *)
-                    echo "✅ База инициализирована, пользователей: $users_count"
-                    ;;
-            esac
+            # Пустой ответ (база ещё не принимает запросы) считаем пустой базой.
+            if [ -z "$users_count" ]; then
+                users_count="0"
+            fi
+            if [ "$users_count" = "0" ]; then
+                echo "⚠️  База пустая: пользователей нет, войти в приложение некому."
+                echo "   Залить данные из Google Sheets (может стереть текущее — см. RUNBOOK.md):"
+                echo "     cd ~/duty"
+                echo "     docker compose --profile tools run --rm migrate"
+                echo "   Восстановить из бэкапа: см. RUNBOOK.md"
+            fi
+            if [ "$users_count" != "0" ]; then
+                echo "✅ База инициализирована, пользователей: $users_count"
+            fi
 
             # Бэкапы БД: ставим/обновляем ежедневный cron. Без бэкапов потеря
             # диска = потеря всех данных. Как восстановиться — RUNBOOK.md.

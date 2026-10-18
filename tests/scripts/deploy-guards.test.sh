@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 #
-# Ловит опасные условия в .github/workflows/deploy.yml.
+# Ловит в .github/workflows/deploy.yml конструкции, которые ломает
+# appleboy/ssh-action при script_stop: true.
 #
-# Деплой едет через appleboy/ssh-action со script_stop: true, а он обрывает
-# скрипт на ЛЮБОМ ненулевом коде команды — включая проверку внутри условия,
-# которая законно вернула 1. Конструкция
+# Что происходит: ssh-action режет скрипт на строки и после каждой вставляет
+# проверку кода возврата (см. scriptCommands в plugin.go):
 #
-#     if [ -z "$x" ] || [ -f "$y" ]; then
+#     DRONE_SSH_PREV_COMMAND_EXIT_CODE=$? ; if [ $... -ne 0 ]; then exit $...; fi;
 #
-# на ложной проверке даёт код 1, и деплой падает (ровно это случилось
-# 18.10.2026). Разрешены case и одиночные проверки; сложную логику лучше
-# выносить в отдельный файл scripts/*.sh — там такого ограничения нет.
+# Отсюда два проверенных на живых деплоях запрета:
+#
+#   * case ... esac — вставка попадает туда, где ожидается шаблон, и скрипт
+#     вообще не разбирается: "syntax error near unexpected token `;'" (a7b6b9c);
+#   * else — вставка идёт первой строкой ветки и видит код 1 от ложного
+#     условия, после чего завершает деплой (85de881).
+#
+# Можно и нужно: цепочки простых if без else, for/do/done, обычные команды.
+# Сложную логику лучше уносить в scripts/*.sh — там переписывания нет и
+# работает обычный bash. Поведение проверяется ещё и прогоном:
+# tests/scripts/deploy-simulation.test.sh.
 #
 # Запуск: bash tests/scripts/deploy-guards.test.sh
 
@@ -24,40 +32,71 @@ if [ ! -f "$workflow" ]; then
     exit 1
 fi
 
-# Ищем if/elif, в условии которых есть || или &&. Комментарии (строки,
-# начинающиеся с #) не трогаем; строки вида `if:` из GitHub Actions не
-# подходят под шаблон, потому что после if идёт двоеточие, а не пробел.
-find_dangerous() {
-    grep -nE "^[[:space:]]*(if|elif)[[:space:]].*(\|\||&&)" "$1" || true
+# case в любой форме (case "..." in).
+find_case() {
+    grep -nE "^[[:space:]]*case[[:space:]]" "$1" || true
 }
 
-# Самопроверка детектора: без неё проверка может молча ничего не находить.
+# Ветка else: либо строка, начинающаяся с else, либо "; else" в одну строку.
+# Комментарии не считаются — они начинаются с #.
+find_else() {
+    grep -nE "^[[:space:]]*else([[:space:]]|;|$)|;[[:space:]]*else([[:space:]]|;|$)" "$1" || true
+}
+
+# Самопроверка детекторов: без неё проверка может молча ничего не находить.
 sample="$(mktemp)"
 trap 'rm -f "$sample"' EXIT
 cat > "$sample" <<'SAMPLE'
-if [ -z "$x" ] || [ -f "$y" ]; then
-    echo этот случай должен быть найден
-fi
-# комментарий: if [ -z "$x" ] || [ -f "$y" ]; then
-if [ -z "$x" ]; then
-    echo этот случай трогать нельзя
-fi
 case "$x" in
-    "") echo case разрешён ;;
+    "") echo case запрещён ;;
 esac
+if [ -z "$x" ]; then
+    echo так можно
+else
+    echo так нельзя
+fi
+if [ -z "$x" ]; then echo тогда; else echo теперь; fi
+# комментарий: case "$x" in и else здесь безобидны
 SAMPLE
-if [ -z "$(find_dangerous "$sample")" ]; then
-    echo "❌ Детектор не нашёл заведомо опасную строку — проверка бессмысленна"
+
+if [ -z "$(find_case "$sample")" ]; then
+    echo "❌ Детектор не нашёл case — проверка бессмысленна"
     exit 1
 fi
-echo "  ok: детектор ловит if с || (и не жалуется на комментарий)"
+echo "  ok: детектор ловит case"
 
-found="$(find_dangerous "$workflow")"
-if [ -n "$found" ]; then
-    echo "❌ В deploy.yml есть if/elif с || или && — ssh-action со script_stop оборвёт деплой:"
-    echo "$found"
-    echo "   Оформите проверку через case или вынесите логику в scripts/*.sh"
+if [ -z "$(find_else "$sample")" ]; then
+    echo "❌ Детектор не нашёл else — проверка бессмысленна"
     exit 1
 fi
+echo "  ok: детектор ловит else и в отдельной строке, и в одну строку"
 
-echo "✅ В deploy.yml нет if/elif с || или &&"
+comment_hits="$(find_else "$sample" | grep -c 'комментарий' | head -n1)"
+if [ "$comment_hits" != "0" ]; then
+    echo "❌ Детектор ругается на строку-комментарий"
+    exit 1
+fi
+echo "  ok: комментарии не считаются нарушением"
+
+status=0
+found_case="$(find_case "$workflow")"
+if [ -n "$found_case" ]; then
+    echo "❌ В deploy.yml есть case — ssh-action не сможет переписать скрипт:"
+    echo "$found_case"
+    echo "   Перепишите через if, а лучше вынесите логику в scripts/*.sh"
+    status=1
+fi
+
+found_else="$(find_else "$workflow")"
+if [ -n "$found_else" ]; then
+    echo "❌ В deploy.yml есть ветка else — такой деплой обрывается:"
+    echo "$found_else"
+    echo "   Вставка проверки кода возврата первой строкой ветки видит код 1"
+    echo "   от ложного условия. Разбейте на два независимых if."
+    status=1
+fi
+
+if [ "$status" -eq 0 ]; then
+    echo "✅ deploy.yml использует только безопасные для ssh-action конструкции"
+fi
+exit "$status"
