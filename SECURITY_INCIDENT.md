@@ -334,35 +334,36 @@ sudo ss -tulpn
 
 ---
 
-## 9. Follow-up по коду: убрать `admin_pin` из query-параметров
+## 9. Сделано: PIN убран из URL, авторизация — по токену
 
-Сейчас админские эндпоинты принимают `admin_name`/`admin_pin` в URL
-(`api/app/routers/users.py`, `sync_history.py`, и фронтенд формирует такие ссылки
-в `frontend/index.html`). Из-за этого PIN-ы попадают в логи nginx, в историю браузера
-и в `Referer`.
+Раньше админские эндпоинты принимали `admin_name`/`admin_pin` в URL
+(`api/app/routers/users.py`, `sync_history.py`), а дежурства — `changer`/`pin`
+в query. Из-за этого PIN-ы попадали в логи nginx, в историю браузера и в `Referer`.
 
-Скетч решения (сделать отдельным PR после мержа текущей работы, чтобы не конфликтовать):
+Реализовано (вместо черновика с `X-Admin-Pin`):
 
-```python
-# api/app/security.py
-from fastapi import Header, HTTPException, Depends
-from sqlalchemy.orm import Session
-from .database import get_db
-from . import crud
+- `POST /api/auth/login` — единственное место, куда клиент присылает PIN;
+  в ответ уходит подписанный токен (`api/app/security.py`, HS256, срок 168 ч,
+  ключ `SECRET_KEY` из `.env`, в деплое — `JWT_SECRET`).
+- Все изменяющие ручки требуют `Authorization: Bearer <token>`
+  (`require_admin` / `get_current_user`).
+- Роль берётся из БД на каждом запросе: разжалованный или удалённый
+  пользователь теряет доступ сразу, не дожидаясь истечения токена.
+- PIN и роль передаются в теле запроса, а не в URL; текст песни тоже переехал
+  в тело — в query он упирался в лимит длины URL.
+- Фронтенд хранит токен в `localStorage` (`currentUserToken`) и подставляет его
+  в запросы через `apiFetch`; PIN в адресах не встречается, старый
+  `currentUserPin` удаляется при загрузке страницы.
+- `POST /api/sync/run` передаёт токен вызывающего в sync-сервис, тот проверяет
+  подпись тем же ключом.
+- Ручка `GET /api/auth/verifyPin` удалена; `GET /api/auth/me` проверяет
+  сохранённый токен при загрузке страницы.
 
-def require_admin(
-    x_admin_name: str = Header(..., alias="X-Admin-Name"),
-    x_admin_pin: str = Header(..., alias="X-Admin-Pin"),
-    db: Session = Depends(get_db),
-) -> str:
-    if not crud.verify_pin(db, x_admin_name, x_admin_pin) or not crud.is_admin(db, x_admin_name):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return x_admin_name
-```
+Переключение чистое, без поддержки старых запросов: после деплоя всем нужно
+войти заново (в браузере остаётся только токен, PIN не хранится).
 
-Далее в роутерах `admin: str = Depends(require_admin)` вместо двух query-параметров,
-а на фронтенде — заголовки `X-Admin-Name` / `X-Admin-Pin` вместо query-строки.
-Следующий шаг после этого — заменить `name`+`pin` на токены сессии.
+Чтение (`/api/duty/matrix`, `/api/songs/`, `/api/repertoire/`,
+`/api/auth/getUserNames`) пока публичное — это отдельная задача.
 
 ---
 

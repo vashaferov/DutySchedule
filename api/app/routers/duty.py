@@ -1,8 +1,9 @@
 import re
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import get_db
-from .. import crud, schemas
+from .. import crud, models, schemas
+from ..security import get_current_user, require_admin
 
 router = APIRouter()
 
@@ -31,11 +32,9 @@ def get_duty_matrix(db: Session = Depends(get_db)):
     return {"dates": date_strs, "names": names, "matrix": matrix}
 
 @router.post("/dates")
-def create_date(req: schemas.DutyDateCreateRequest, db: Session = Depends(get_db)):
-    # Заводить даты можно только от имени администратора.
-    if not crud.verify_pin(db, req.changer, req.pin) or not crud.is_admin(db, req.changer):
-        raise HTTPException(status_code=403, detail="Admin access required")
-
+def create_date(req: schemas.DutyDateCreateRequest,
+                user: models.User = Depends(require_admin),
+                db: Session = Depends(get_db)):
     date_str = normalize_date_str(req.date_str)
     if not DATE_STR_RE.match(date_str):
         raise HTTPException(
@@ -50,20 +49,15 @@ def create_date(req: schemas.DutyDateCreateRequest, db: Session = Depends(get_db
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    crud.set_sync_flag(db, True, req.changer, f"добавлена дата {date_str}")
+    crud.set_sync_flag(db, True, user.name, f"добавлена дата {date_str}")
     return {"success": True, "date_str": date_str}
 
 @router.delete("/dates/{date_str}")
 def delete_date(
     date_str: str,
-    changer: str = Query(...),
-    pin: str = Query(...),
+    user: models.User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    # Удалять даты может только администратор.
-    if not crud.verify_pin(db, changer, pin) or not crud.is_admin(db, changer):
-        raise HTTPException(status_code=403, detail="Admin access required")
-
     date_str = normalize_date_str(date_str)
     try:
         crud.delete_date(db, date_str)
@@ -75,20 +69,20 @@ def delete_date(
     # Удалённые строки не оставляют нового updated_at, поэтому обычная проверка
     # изменений в sync не сработает — просим перезалить листы целиком.
     crud.set_force_full_sync(db, True)
-    crud.set_sync_flag(db, True, changer, f"удалена дата {date_str}")
+    crud.set_sync_flag(db, True, user.name, f"удалена дата {date_str}")
     return {"success": True, "date_str": date_str}
 
 @router.post("/toggle")
-def toggle_duty(req: schemas.DutyToggleRequest, db: Session = Depends(get_db)):
-    # Проверка авторизации (вызов crud.verify_pin)
-    if not crud.verify_pin(db, req.changer, req.pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    if not crud.is_admin(db, req.changer) and req.changer != req.user_name:
+def toggle_duty(req: schemas.DutyToggleRequest,
+                user: models.User = Depends(get_current_user),
+                db: Session = Depends(get_db)):
+    # Менять можно только своё дежурство; администратор — любое.
+    if user.role != "admin" and user.name != req.user_name:
         raise HTTPException(status_code=403, detail="Not authorized")
     try:
         crud.toggle_duty(db, req.date_str, req.user_name, req.value)
         action = 'назначено' if req.value else 'снято'
-        crud.set_sync_flag(db, True, req.changer, f"дежурство {req.date_str}: {req.user_name} — {action}")
+        crud.set_sync_flag(db, True, user.name, f"дежурство {req.date_str}: {req.user_name} — {action}")
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

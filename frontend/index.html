@@ -364,7 +364,7 @@
       let repertoirePast = [];
       let repertoireCurrentPage = 0;
       let currentUser = '';
-      let currentPin = '';
+      let authToken = '';   // вместо PIN: сам PIN в браузере больше не хранится
       let isAdmin = false;
       let allSongs = [];
       let songsCurrentPage = 0;
@@ -503,11 +503,27 @@
       });
 
       // ---------- API-вызовы (новые) ----------
-      async function verifyPinOnServer(name, pin) {
-        const url = API_URL + '/auth/verifyPin?name=' + encodeURIComponent(name) + '&pin=' + encodeURIComponent(pin);
-        const resp = await fetch(url);
-        const data = await resp.json();
-        return data.success === true;
+      // Токен подставляется во все запросы. PIN по сети ходит только один раз —
+      // в /auth/login, поэтому в адресах его больше нет (и в логах nginx тоже).
+      async function apiFetch(path, options) {
+        const opts = Object.assign({}, options || {});
+        if (authToken) {
+          opts.headers = Object.assign({}, opts.headers || {}, {
+            'Authorization': 'Bearer ' + authToken
+          });
+        }
+        const resp = await fetch(API_URL + path, opts);
+        if (resp.status === 401) {
+          handleSessionExpired();
+        }
+        return resp;
+      }
+
+      function handleSessionExpired() {
+        if (!currentUser && !authToken) return;
+        logoutUser();
+        showNotification('Сессия истекла, войдите заново', 'warning');
+        showLoginModal();
       }
 
       async function loadUsers() {
@@ -520,9 +536,8 @@
         return data.names || [];
       }
 
-      async function loadUsersForAdmin(adminName, adminPin) {
-        const url = `${API_URL}/auth/getUsers?admin_name=${encodeURIComponent(adminName)}&admin_pin=${encodeURIComponent(adminPin)}`;
-        const resp = await fetch(url);
+      async function loadUsersForAdmin() {
+        const resp = await apiFetch('/auth/getUsers');
         const data = await resp.json();
         if (data.error) {
           throw new Error(data.error);
@@ -565,12 +580,23 @@
         }
       }
 
-      function setUser(name, pin, admin) {
+      function clearSession() {
+        currentUser = '';
+        authToken = '';
+        isAdmin = false;
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('currentUserToken');
+        localStorage.removeItem('currentUserRole');
+        localStorage.removeItem('currentUserPin');   // формат до перехода на токены
+      }
+
+      function setUser(name, token, admin) {
         currentUser = name;
-        currentPin = pin;
+        authToken = token;
         isAdmin = admin;
         localStorage.setItem('currentUser', name);
-        localStorage.setItem('currentUserPin', pin);
+        localStorage.setItem('currentUserToken', token);
+        localStorage.setItem('currentUserRole', admin ? 'admin' : 'user');
         updateAuthUI();
         renderRepertoire();
         renderMainCards();
@@ -578,41 +604,40 @@
       }
 
       function logoutUser() {
-        currentUser = '';
-        currentPin = '';
-        isAdmin = false;
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('currentUserPin');
+        clearSession();
         updateAuthUI();
         renderMainCards();
         renderArchiveTable();
       }
 
       async function autoLogin() {
-        const savedUser = localStorage.getItem('currentUser');
-        const savedPin = localStorage.getItem('currentUserPin');
-        if (!savedUser || !savedPin) return;
-        const valid = await verifyPinOnServer(savedUser, savedPin);
-        if (valid) {
-          try {
-            const resp = await fetch(`${API_URL}/auth/getUsers?admin_name=${encodeURIComponent(savedUser)}&admin_pin=${encodeURIComponent(savedPin)}`);
-            if (resp.ok) {
-              isAdmin = true;
-            } else {
-              isAdmin = false;
-            }
-          } catch (e) {
-            isAdmin = false;
+        // Формат до перехода на токены: PIN в браузере больше не храним.
+        localStorage.removeItem('currentUserPin');
+
+        const savedToken = localStorage.getItem('currentUserToken');
+        if (!savedToken) return;
+
+        authToken = savedToken;
+        try {
+          const resp = await fetch(API_URL + '/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + savedToken }
+          });
+          if (!resp.ok) {
+            // Токен истёк, либо пользователя удалили/разжаловали.
+            clearSession();
+            return;
           }
-          currentUser = savedUser;
-          currentPin = savedPin;
+          const me = await resp.json();
+          currentUser = me.name;
+          isAdmin = me.role === 'admin';
+          localStorage.setItem('currentUser', me.name);
+          localStorage.setItem('currentUserRole', me.role);
           updateAuthUI();
           renderRepertoire();
           renderMainCards();
           renderArchiveTable();
-        } else {
-          localStorage.removeItem('currentUser');
-          localStorage.removeItem('currentUserPin');
+        } catch (e) {
+          clearSession();
         }
       }
 
@@ -670,25 +695,25 @@
           showGlobalLoader();
 
           try {
-            const valid = await verifyPinOnServer(name, pin);
-            if (valid) {
-              let admin = false;
-              try {
-                const resp = await fetch(`${API_URL}/auth/getUsers?admin_name=${encodeURIComponent(name)}&admin_pin=${encodeURIComponent(pin)}`);
-                if (resp.ok) {
-                  admin = true;
-                }
-              } catch (e) { /* не админ */ }
+            const resp = await fetch(API_URL + '/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: name, pin: pin })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data.token) {
               modal.style.display = 'none';
-              setUser(name, pin, admin);
+              setUser(name, data.token, data.role === 'admin');
             } else {
-              error.textContent = 'Неверный PIN-код';
+              error.textContent = resp.status === 401
+                ? 'Неверный PIN-код'
+                : 'Не удалось войти, попробуйте ещё раз';
               error.style.display = 'block';
               pinInput.value = '';
               pinInput.focus();
             }
           } catch (e) {
-            error.textContent = 'Ошибка проверки PIN';
+            error.textContent = 'Ошибка соединения';
             error.style.display = 'block';
             showNotification(e.message, 'error');
           } finally {
@@ -721,7 +746,7 @@
         if (!isAdmin) return;
         showGlobalLoader();
         try {
-          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          const userList = await loadUsersForAdmin();
           allUsers = userList;
           selectedAdminUser = null;
           renderAdminSearchResults('');
@@ -829,15 +854,17 @@
         }
         try {
           showGlobalLoader();
-          const resp = await fetch(`${API_URL}/users/${encodeURIComponent(selectedAdminUser.name)}/pin?new_pin=${encodeURIComponent(newPin)}&admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`, {
-            method: 'PUT'
+          const resp = await apiFetch(`/users/${encodeURIComponent(selectedAdminUser.name)}/pin`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_pin: newPin })
           });
           const result = await resp.json();
           if (!resp.ok) throw new Error(result.detail || 'Ошибка');
           showNotification('PIN успешно обновлён', 'success');
           document.getElementById('admin-user-message').style.display = 'none';
           // Обновим список пользователей (перезагрузим)
-          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          const userList = await loadUsersForAdmin();
           allUsers = userList;
           renderAdminSearchResults(document.getElementById('admin-search-input').value);
           // Если выбранный пользователь обновился, обновим отображение
@@ -860,14 +887,16 @@
         const newRole = document.getElementById('admin-role-checkbox').checked ? 'admin' : 'user';
         try {
           showGlobalLoader();
-          const resp = await fetch(`${API_URL}/users/${encodeURIComponent(selectedAdminUser.name)}/role?role=${newRole}&admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`, {
-            method: 'PUT'
+          const resp = await apiFetch(`/users/${encodeURIComponent(selectedAdminUser.name)}/role`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: newRole })
           });
           const result = await resp.json();
           if (!resp.ok) throw new Error(result.detail || 'Ошибка');
           showNotification('Роль успешно обновлена', 'success');
           // Обновим список пользователей
-          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          const userList = await loadUsersForAdmin();
           allUsers = userList;
           renderAdminSearchResults(document.getElementById('admin-search-input').value);
           const updated = allUsers.find(u => u.name === selectedAdminUser.name);
@@ -899,14 +928,14 @@
         if (!confirm(`Удалить пользователя "${selectedAdminUser.name}"?`)) return;
         try {
           showGlobalLoader();
-          const resp = await fetch(`${API_URL}/users/${encodeURIComponent(selectedAdminUser.name)}?admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`, {
+          const resp = await apiFetch(`/users/${encodeURIComponent(selectedAdminUser.name)}`, {
             method: 'DELETE'
           });
           const result = await resp.json();
           if (!resp.ok) throw new Error(result.detail || 'Ошибка');
           showNotification('Пользователь удалён', 'success');
           // Обновим список
-          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          const userList = await loadUsersForAdmin();
           allUsers = userList;
           selectedAdminUser = null;
           document.getElementById('admin-selected-user').style.display = 'none';
@@ -930,13 +959,10 @@
         }
         try {
           showGlobalLoader();
-          const params = new URLSearchParams();
-          params.append('name', name);
-          params.append('pin', pin);
-          params.append('admin_name', currentUser);
-          params.append('admin_pin', currentPin);
-          const resp = await fetch(`${API_URL}/users?${params.toString()}`, {
-            method: 'POST'
+          const resp = await apiFetch('/users/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, pin: pin })
           });
           const result = await resp.json();
           if (!resp.ok) throw new Error(result.detail || 'Ошибка');
@@ -949,7 +975,7 @@
           document.getElementById('admin-create-pin').value = '';
           document.getElementById('admin-create-error').style.display = 'none';
           // Обновляем список пользователей
-          const userList = await loadUsersForAdmin(currentUser, currentPin);
+          const userList = await loadUsersForAdmin();
           allUsers = userList;
           renderAdminSearchResults(document.getElementById('admin-search-input').value);
         } catch (e) {
@@ -965,7 +991,7 @@
         if (!isAdmin) return;
         try {
           showGlobalLoader();
-          const resp = await fetch(`${API_URL}/sync/run?changer=${encodeURIComponent(currentUser)}&pin=${encodeURIComponent(currentPin)}`, {
+          const resp = await apiFetch('/sync/run', {
             method: 'POST'
           });
           const data = await resp.json();
@@ -1014,10 +1040,10 @@
 
         try {
           showGlobalLoader();
-          const resp = await fetch(`${API_URL}/duty/dates`, {
+          const resp = await apiFetch('/duty/dates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date_str: dateStr, changer: currentUser, pin: currentPin })
+            body: JSON.stringify({ date_str: dateStr })
           });
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.detail || 'Ошибка добавления даты');
@@ -1063,14 +1089,14 @@
       }
 
       // ---------- Управление песнями (новые эндпоинты) ----------
-      async function loadSongs(adminName, adminPin) {
+      async function loadSongs() {
         const resp = await fetch(API_URL + '/songs/');
         if (!resp.ok) throw new Error('Ошибка загрузки песен');
         return await resp.json();
       }
 
-      async function addNewSong(name, text, changer, pin) {
-        const resp = await fetch(`${API_URL}/songs/?changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
+      async function addNewSong(name, text) {
+        const resp = await apiFetch('/songs/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, text })
@@ -1080,17 +1106,20 @@
         return true;
       }
 
-      async function updateSongTextOnServer(name, newText, changer, pin) {
-        const resp = await fetch(`${API_URL}/songs/${encodeURIComponent(name)}?new_text=${encodeURIComponent(newText)}&changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
-          method: 'PUT'
+      async function updateSongTextOnServer(name, newText) {
+        // Текст песни едет в теле запроса: в query он упирался в лимит длины URL.
+        const resp = await apiFetch(`/songs/${encodeURIComponent(name)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: newText })
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || 'Ошибка обновления текста');
         return true;
       }
 
-      async function deleteSongOnServer(name, changer, pin) {
-        const resp = await fetch(`${API_URL}/songs/${encodeURIComponent(name)}?changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
+      async function deleteSongOnServer(name) {
+        const resp = await apiFetch(`/songs/${encodeURIComponent(name)}`, {
           method: 'DELETE'
         });
         const data = await resp.json();
@@ -1098,13 +1127,13 @@
         return true;
       }
 
-      async function setRepertoireSongs(date, songItems, changer, pin) {
+      async function setRepertoireSongs(date, songItems) {
         // Преобразуем в массив строк и убираем дубликаты
         const songNames = songItems
           .map(item => typeof item === 'string' ? item : item.name)
           .filter((name, index, self) => self.indexOf(name) === index);
 
-        const resp = await fetch(`${API_URL}/repertoire/${encodeURIComponent(date)}?changer=${encodeURIComponent(changer)}&pin=${encodeURIComponent(pin)}`, {
+        const resp = await apiFetch(`/repertoire/${encodeURIComponent(date)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ songs: songNames })
@@ -1123,7 +1152,7 @@
         showGlobalLoader();
         let songs = [];
         try {
-          songs = await loadSongs(currentUser, currentPin);
+          songs = await loadSongs();
         } catch (e) {
           showNotification('Ошибка загрузки песен: ' + e.message, 'error');
           hideGlobalLoader();
@@ -1179,7 +1208,7 @@
               if (!confirm('Удалить песню "' + song.name + '"?')) return;
               try {
                 showGlobalLoader();
-                await deleteSongOnServer(song.name, currentUser, currentPin);
+                await deleteSongOnServer(song.name);
                 showNotification('Песня удалена', 'success');
                 await showSongsModal();
               } catch (e) {
@@ -1247,7 +1276,7 @@
         error.style.display = 'none';
         try {
           showGlobalLoader();
-          await addNewSong(name, text, currentUser, currentPin);
+          await addNewSong(name, text);
           showNotification('Песня добавлена', 'success');
           closeModal(document.getElementById('add-song-modal'));
           await showSongsModal();
@@ -1292,7 +1321,7 @@
         const newText = textarea.value;
         try {
           showGlobalLoader();
-          await updateSongTextOnServer(currentEditSongName, newText, currentUser, currentPin);
+          await updateSongTextOnServer(currentEditSongName, newText);
           showNotification('Текст песни обновлён', 'success');
           closeModal(document.getElementById('edit-song-modal'));
           await showSongsModal();
@@ -1317,7 +1346,7 @@
 
         // Загружаем список песен, если пусто
         if (!allSongs.length) {
-          loadSongs(currentUser, currentPin).then(songs => {
+          loadSongs().then(songs => {
             allSongs = songs;
             fillRepertoireDatalist(datalist);
           }).catch(e => showNotification('Ошибка загрузки песен: ' + e.message, 'error'));
@@ -1408,7 +1437,7 @@
           }
 
           const newSongs = [...currentSongNames, songName];
-          await setRepertoireSongs(currentRepertoireDate, newSongs, currentUser, currentPin);
+          await setRepertoireSongs(currentRepertoireDate, newSongs);
           await refreshRepertoire();
           document.getElementById('add-repertoire-song-modal').style.display = 'none';
           showNotification('Песня добавлена', 'success');
@@ -1674,8 +1703,8 @@
 
         try {
           showGlobalLoader();
-          const resp = await fetch(
-            `${API_URL}/duty/dates/${encodeURIComponent(dateStr)}?changer=${encodeURIComponent(currentUser)}&pin=${encodeURIComponent(currentPin)}`,
+          const resp = await apiFetch(
+            `/duty/dates/${encodeURIComponent(dateStr)}`,
             { method: 'DELETE' }
           );
           const data = await resp.json().catch(() => ({}));
@@ -1828,11 +1857,10 @@
           const payload = {
             date_str: dateStr,
             user_name: userName,
-            value: newValue,
-            changer: currentUser,
-            pin: currentPin
+            value: newValue
           };
-          const resp = await fetch(API_URL + '/duty/toggle', {
+          // Кто вносит изменение, сервер теперь узнаёт из токена.
+          const resp = await apiFetch('/duty/toggle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1987,11 +2015,10 @@
           const payload = {
             date_str: date,
             user_name: name,
-            value: newValue,
-            changer: currentUser,
-            pin: currentPin
+            value: newValue
           };
-          const resp = await fetch(API_URL + '/duty/toggle', {
+          // Кто вносит изменение, сервер теперь узнаёт из токена.
+          const resp = await apiFetch('/duty/toggle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -2288,7 +2315,7 @@
           const currentSongs = entry.songs || [];
           const currentSongNames = currentSongs.map(s => typeof s === 'string' ? s : s.name);
           const newSongs = currentSongNames.filter(name => name !== songName);
-          await setRepertoireSongs(date, newSongs, currentUser, currentPin);
+          await setRepertoireSongs(date, newSongs);
           await refreshRepertoire();
           showNotification('Песня удалена из репертуара', 'success');
         } catch (e) {
@@ -2311,7 +2338,7 @@
         [newSongNames[index], newSongNames[index - 1]] = [newSongNames[index - 1], newSongNames[index]];
         try {
           showGlobalLoader();
-          await setRepertoireSongs(date, newSongNames, currentUser, currentPin);
+          await setRepertoireSongs(date, newSongNames);
           await refreshRepertoire();
         } catch (e) {
           showNotification('Ошибка изменения порядка: ' + e.message, 'error');
@@ -2333,7 +2360,7 @@
         [newSongNames[index], newSongNames[index + 1]] = [newSongNames[index + 1], newSongNames[index]];
         try {
           showGlobalLoader();
-          await setRepertoireSongs(date, newSongNames, currentUser, currentPin);
+          await setRepertoireSongs(date, newSongNames);
           await refreshRepertoire();
         } catch (e) {
           showNotification('Ошибка изменения порядка: ' + e.message, 'error');
@@ -2514,7 +2541,7 @@
         if (!isAdmin) return;
         try {
           showGlobalLoader();
-          const resp = await fetch(`${API_URL}/sync/history?admin_name=${encodeURIComponent(currentUser)}&admin_pin=${encodeURIComponent(currentPin)}`);
+          const resp = await apiFetch('/sync/history');
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.detail || 'Ошибка');
           const container = document.getElementById('sync-history-list');

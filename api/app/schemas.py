@@ -40,15 +40,11 @@ class DutyToggleRequest(BaseModel):
     date_str: str
     user_name: str
     value: bool
-    changer: str
-    pin: str
 
 
 class DutyDateCreateRequest(BaseModel):
     # Свободный формат: "10.10.2026" или "10.10.2026 (утро 10-12)"
     date_str: str
-    changer: str
-    pin: str
 
 
 class DutyMatrixResponse(BaseModel):
@@ -71,6 +67,11 @@ class SongResponse(SongBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SongTextUpdateRequest(BaseModel):
+    # Текст песни приходит в теле: в query он упирается в лимит длины URL.
+    text: str
 
 
 # ----- Repertoire -----
@@ -105,13 +106,19 @@ class LoginResponse(BaseModel):
     role: Optional[str] = None
 
 
-class VerifyPinRequest(BaseModel):
-    name: str
-    pin: str
+class UserCreateRequest(UserCreate):
+    """Создание пользователя админом: PIN и роль приходят в теле, не в URL."""
+
+    role: str = "user"
 
 
-class VerifyPinResponse(BaseModel):
-    success: bool
+class UserPinUpdateRequest(BaseModel):
+    # Новый PIN — только в теле запроса: в query string он попал бы в логи.
+    new_pin: str
+
+
+class UserRoleUpdateRequest(BaseModel):
+    role: str
 
 
 class UserNamesResponse(BaseModel):

@@ -56,3 +56,39 @@ def test_user(db):
     user = schemas.UserCreate(name="test_user", pin="1234")
     crud.create_user(db, user)
     return user
+
+
+@pytest.fixture
+def auth_headers():
+    """
+    Заголовок авторизации так, как его присылает фронтенд: Bearer-токен вместо
+    PIN. Роль в токене не главное — ручки берут её из базы.
+    """
+    from app.security import create_token
+
+    def _headers(name, role="user"):
+        return {"Authorization": f"Bearer {create_token(name, role)}"}
+
+    return _headers
+
+
+@pytest.fixture
+def make_user(db):
+    """Создаёт пользователя в БД: make_user("name", pin="1234", role="user")."""
+    from app import crud, schemas
+
+    def _make(name, pin="1234", role="user"):
+        crud.create_user(db, schemas.UserCreate(name=name, pin=pin))
+        if role != "user":
+            crud.update_user_role(db, name, role)
+        return name
+
+    return _make
+
+
+@pytest.fixture
+def make_admin(make_user):
+    def _make(name, pin="1234"):
+        return make_user(name, pin=pin, role="admin")
+
+    return _make

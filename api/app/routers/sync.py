@@ -1,20 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from ..database import get_db
-from .. import crud
+from fastapi import APIRouter, Depends, HTTPException, Request
+from .. import models
+from ..security import require_admin
 import httpx
 
 router = APIRouter()
 
 @router.post("/run")
-async def run_sync(changer: str = Query(...), pin: str = Query(...), db: Session = Depends(get_db)):
-    if not crud.verify_pin(db, changer, pin) or not crud.is_admin(db, changer):
-        raise HTTPException(status_code=403, detail="Admin access required")
+async def run_sync(request: Request, user: models.User = Depends(require_admin)):
+    # Токен вызывающего передаём в sync-сервис как есть: он проверит подпись и
+    # роль сам. PIN для этого больше не нужен и никуда не передаётся.
+    auth_header = request.headers.get("authorization", "")
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 "http://duty_sync:8001/run",
-                params={"admin_name": changer, "admin_pin": pin},
+                headers={"Authorization": auth_header},
                 timeout=300
             )
             data = resp.json()
@@ -23,5 +23,7 @@ async def run_sync(changer: str = Query(...), pin: str = Query(...), db: Session
             return {"success": True, "message": "Sync completed"}
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="Sync service unavailable")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -30,9 +30,8 @@ services:
     container_name: duty_api
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
-      # Внимание: код пока НЕ использует SECRET_KEY (нет токен-авторизации).
-      # Переменная прокидывается из JWT_SECRET, т.к. именно его кладёт .env/CI.
-      # Заполните JWT_SECRET перед тем, как включать выдачу токенов.
+      # Ключ подписи токенов авторизации. Деплой гарантирует непустое значение:
+      # если JWT_SECRET не задан в секретах, он генерируется и сохраняется в .env.
       SECRET_KEY: ${JWT_SECRET:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-https://mediahlg.ru}
       # Ключ Google Sheets здесь НЕ нужен: api его не использует.
@@ -56,6 +55,8 @@ services:
       GOOGLE_SHEETS_CREDENTIALS: ${GOOGLE_SHEETS_CREDENTIALS}
       SPREADSHEET_ID: ${SPREADSHEET_ID}
       SYNC_INTERVAL: 60
+      # Тот же ключ, что у api: sync проверяет токен, который api ему передаёт.
+      SECRET_KEY: ${JWT_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -2,17 +2,36 @@ import os
 import threading
 import time
 import logging
-from fastapi import FastAPI, Query
+from typing import Optional
+from fastapi import FastAPI, Header
+from jose import JWTError, jwt
 from sync import main_sync
 from models import Base, User
 from database import SessionLocal, engine
-from passlib.context import CryptContext
 import uvicorn
 
 app = FastAPI(title="Sync Server")
 logger = logging.getLogger(__name__)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Тот же ключ, что у API: sync проверяет токен, который API передал как есть.
+SECRET_KEY = (os.getenv("SECRET_KEY") or "").strip()
+ALGORITHM = "HS256"
+
+
+def _user_from_token(token: str) -> Optional[str]:
+    """Проверяет подпись токена API и возвращает имя пользователя."""
+    if not SECRET_KEY:
+        logger.error(
+            "SECRET_KEY не задан — проверить токен нельзя, ручной запуск синхронизации отключён. "
+            "Задайте JWT_SECRET в секретах GitHub (деплой прокидывает его в .env)."
+        )
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    return payload.get("sub")
+
 
 # Периодичность фоновой синхронизации (в sync.py было жёстко 30).
 SYNC_INTERVAL = int(os.getenv("SYNC_INTERVAL", "30"))
@@ -34,13 +53,20 @@ def _sync_loop():
 
 
 @app.post("/run")
-def run_sync(admin_name: str = Query(...), admin_pin: str = Query(...)):
+def run_sync(authorization: Optional[str] = Header(default=None)):
+    # Раньше здесь проверялся admin_pin из query. Теперь API присылает токен
+    # вызывающего: PIN по сети не ходит вообще.
+    token = ''
+    if authorization and authorization.lower().startswith('bearer '):
+        token = authorization[7:].strip()
+    name = _user_from_token(token)
+    if not name:
+        return {"success": False, "error": "Unauthorized"}
+
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.name == admin_name).first()
-        if not user or not user.pin_hash or not pwd_context.verify(admin_pin, user.pin_hash):
-            return {"success": False, "error": "Invalid credentials"}
-        if user.role != "admin":
+        user = db.query(User).filter(User.name == name).first()
+        if not user or user.role != "admin":
             return {"success": False, "error": "Admin access required"}
     finally:
         db.close()
