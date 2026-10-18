@@ -36,7 +36,14 @@ jobs:
         run: node tests/frontend/xss.test.js
 
       - name: Bash syntax checks
-        run: bash -n scripts/backup-db.sh scripts/restore-db.sh
+        run: |
+          bash -n scripts/backup-db.sh scripts/restore-db.sh scripts/install-backup-cron.sh
+          bash tests/scripts/deploy-guards.test.sh
+
+      # Установка cron для бэкапов: проверяем, что задача ставится и не
+      # дублируется. Реальный crontab не трогаем — он подменён заглушкой.
+      - name: Backup cron installer test
+        run: bash tests/scripts/install-backup-cron.test.sh
 
   deploy:
     needs: test
@@ -96,11 +103,35 @@ jobs:
 
             echo "Creating .env file..."
             umask 077
+
+            # Ключ подписи токенов. Если JWT_SECRET не задан в секретах GitHub —
+            # берём прежний из .env, иначе генерируем. Пустой ключ означал бы,
+            # что все токены умирают при каждом перезапуске API.
+            #
+            # Проверки оформлены через case, а не через if [ ... ] || [ ... ]:
+            # appleboy/ssh-action со script_stop: true обрывает деплой на ЛЮБОМ
+            # ненулевом коде команды, включая проверку внутри условия, которая
+            # законно вернула 1 (так и упал деплой 85de881).
+            JWT_SECRET_VALUE="${{ secrets.JWT_SECRET }}"
+            case "$JWT_SECRET_VALUE" in
+                "")
+                    # Прежний ключ из .env: нужен, чтобы он не менялся от деплоя
+                    # к деплою (иначе все выданные токены умирают).
+                    JWT_SECRET_VALUE=$(sed -n 's/^JWT_SECRET=//p' ~/duty/.env 2>/dev/null | head -n1)
+                    ;;
+            esac
+            case "$JWT_SECRET_VALUE" in
+                "")
+                    JWT_SECRET_VALUE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+                    echo "⚠️  JWT_SECRET не задан в секретах GitHub — сгенерирован и сохранён в ~/duty/.env"
+                    ;;
+            esac
+
             cat > ~/duty/.env << EOF
             DB_NAME=${{ secrets.DB_NAME }}
             DB_USER=${{ secrets.DB_USER }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_SECRET=$JWT_SECRET_VALUE
             SPREADSHEET_ID=${{ secrets.SPREADSHEET_ID }}
             GOOGLE_SHEETS_CREDENTIALS=${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
             DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/${{ secrets.DB_NAME }}
@@ -133,32 +164,24 @@ jobs:
             # Проверяем, есть ли в базе пользователи (таблицы к этому моменту уже созданы).
             # ВАЖНО: ничего не стираем и не мигрируем автоматически — импорт из Google
             # Sheets перезаписывает данные, это ручное осознанное действие.
+            # case, а не if [ ... ] || [ ... ]: см. пояснение выше про script_stop
+            # (именно эта проверка и оборвала предыдущий деплой).
             users_count=$($DOCKER_COMPOSE exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -tAc "SELECT count(*) FROM users;" 2>/dev/null | tr -d '[:space:]')
-            if [ "$users_count" = "0" ] || [ -z "$users_count" ]; then
-                echo "⚠️  База пустая: пользователей нет, войти в приложение некому."
-                echo "   Залить данные из Google Sheets (может стереть текущее — см. RUNBOOK.md):"
-                echo "     cd ~/duty && docker compose --profile tools run --rm migrate"
-                echo "   Восстановить из бэкапа: см. RUNBOOK.md"
-            else
-                echo "✅ База инициализирована, пользователей: $users_count"
-            fi
+            case "$users_count" in
+                0|"")
+                    echo "⚠️  База пустая: пользователей нет, войти в приложение некому."
+                    echo "   Залить данные из Google Sheets (может стереть текущее — см. RUNBOOK.md):"
+                    echo "     cd ~/duty && docker compose --profile tools run --rm migrate"
+                    echo "   Восстановить из бэкапа: см. RUNBOOK.md"
+                    ;;
+                *)
+                    echo "✅ База инициализирована, пользователей: $users_count"
+                    ;;
+            esac
 
             # Бэкапы БД: ставим/обновляем ежедневный cron. Без бэкапов потеря
             # диска = потеря всех данных. Как восстановиться — RUNBOOK.md.
-            BACKUP_DIR="$HOME/duty-backups"
-            mkdir -p "$BACKUP_DIR"
-            if command -v crontab &>/dev/null && [ -f "$HOME/duty/scripts/backup-db.sh" ]; then
-                chmod +x "$HOME/duty/scripts/backup-db.sh"
-                # Перезаписываем только свою строку, чужие задачи пользователя не трогаем.
-                {
-                    crontab -l 2>/dev/null | grep -v 'scripts/backup-db.sh' || true
-                    echo "15 3 * * * ENV_FILE=$HOME/duty/.env BACKUP_DIR=$BACKUP_DIR $HOME/duty/scripts/backup-db.sh >> $BACKUP_DIR/backup.log 2>&1"
-                } > /tmp/duty-crontab.$$
-                crontab /tmp/duty-crontab.$$
-                rm -f /tmp/duty-crontab.$$
-                echo "✅ Бэкапы: ежедневно в 03:15, каталог $BACKUP_DIR, храним 14 дней"
-            else
-                echo "⚠️  Бэкапы НЕ настроены (нет crontab или scripts/backup-db.sh) — см. RUNBOOK.md"
-            fi
+            # Логика в отдельном скрипте: у него нет ограничений script_stop.
+            bash ~/duty/scripts/install-backup-cron.sh
 
             echo "✅ Deployment completed successfully."
