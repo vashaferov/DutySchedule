@@ -1575,7 +1575,10 @@
       <div class="duty-card" data-date="${dateStr}">
         <div class="duty-card-header">
           <span class="duty-date">${formatDateDisplay(dateStr)}</span>
-          <span class="duty-count">${checkedCount}/${MAX_PER_DAY}</span>
+          <span class="duty-card-header-right">
+            <span class="duty-count">${checkedCount}/${MAX_PER_DAY}</span>
+            ${isAdmin ? '<button class="btn-delete-date" title="Удалить дату" aria-label="Удалить дату">🗑️</button>' : ''}
+          </span>
         </div>
         <div class="duty-card-body">
           <div class="duty-progress">
@@ -1643,6 +1646,49 @@
           btn.removeEventListener('click', handleAssignDutyInline);
           btn.addEventListener('click', handleAssignDutyInline);
         });
+
+        // Удаление даты (только админ)
+        document.querySelectorAll('.btn-delete-date').forEach(btn => {
+          btn.removeEventListener('click', handleDeleteDate);
+          btn.addEventListener('click', handleDeleteDate);
+        });
+      }
+
+      async function handleDeleteDate(e) {
+        e.stopPropagation();
+        const btn = e.currentTarget;
+        // Дата берётся из самой карточки — та же строка, что используют остальные обработчики.
+        const card = btn.closest('.duty-card');
+        const dateStr = card ? card.dataset.date : null;
+        if (!dateStr) return;
+
+        const entry = allDates.find(d => d.dateStr === dateStr);
+        const assignedCount = entry ? entry.matrixRow.filter(v => v === true).length : 0;
+
+        let confirmText = `Удалить дату «${dateStr}»?\n\n`;
+        if (assignedCount > 0) {
+          confirmText += `Вместе с датой удалятся дежурные (${assignedCount}) и весь репертуар на неё.\n\n`;
+        }
+        confirmText += 'Действие необратимо.';
+        if (!confirm(confirmText)) return;
+
+        try {
+          showGlobalLoader();
+          const resp = await fetch(
+            `${API_URL}/duty/dates/${encodeURIComponent(dateStr)}?changer=${encodeURIComponent(currentUser)}&pin=${encodeURIComponent(currentPin)}`,
+            { method: 'DELETE' }
+          );
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok) throw new Error(data.detail || 'Не удалось удалить дату');
+
+          await refreshDutyData();
+          await refreshRepertoire();
+          showNotification('Дата удалена', 'success');
+        } catch (err) {
+          showNotification('Ошибка: ' + err.message, 'error');
+        } finally {
+          hideGlobalLoader();
+        }
       }
 
       function handleAssignDutyInline(e) {

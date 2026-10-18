@@ -70,7 +70,7 @@ def sync_users(db):
 
 def sync_duty(db):
     last_sync = get_last_sync_time(db, 'last_sync_duty')
-    if not has_duty_changes(db, last_sync):
+    if not is_forced_sync(db) and not has_duty_changes(db, last_sync):
         logger.info("No changes in duty data, skipping sync")
         return
 
@@ -98,7 +98,7 @@ def sync_duty(db):
 
 def sync_repertoire(db):
     last_sync = get_last_sync_time(db, 'last_sync_repertoire')
-    if not has_repertoire_changes(db, last_sync):
+    if not is_forced_sync(db) and not has_repertoire_changes(db, last_sync):
         logger.info("No changes in repertoire data, skipping sync")
         return
 
@@ -163,6 +163,25 @@ def has_repertoire_changes(db, last_sync):
         return True
     count = db.query(DutyDate).filter(DutyDate.updated_at > last_sync).count()
     return count > 0
+
+
+# ---------- Принудительная полная перезаливка ----------
+FORCE_FULL_SYNC_KEY = 'force_full_sync'
+
+
+def is_forced_sync(db):
+    """Удаление даты не оставляет строк с новым updated_at, поэтому сравнение
+    «что изменилось» его не увидит. В этом случае перезаливаем листы целиком."""
+    row = db.query(SyncMetadata).filter(SyncMetadata.key == FORCE_FULL_SYNC_KEY).first()
+    return bool(row and row.value and row.value.strip().lower() == 'true')
+
+
+def clear_forced_sync(db):
+    row = db.query(SyncMetadata).filter(SyncMetadata.key == FORCE_FULL_SYNC_KEY).first()
+    if row and (row.value or '').strip().lower() != 'false':
+        row.value = 'false'
+        db.commit()
+# ---------------------------------------------
 
 
 # ---------- История синхронизаций (добавлено) ----------
@@ -240,6 +259,7 @@ def main_sync():
             flag_row.value = 'false'
             db.commit()
             clear_pending_changes(db)
+            clear_forced_sync(db)
             update_sync_history(db, history_id, 'success', 'Sync completed successfully')
             logger.info("Sync completed successfully")
         except Exception as e:

@@ -48,6 +48,22 @@ def create_date(db: Session, date_str: str):
     db.refresh(date)
     return date
 
+def delete_date(db: Session, date_str: str):
+    """Удалить дату вместе с дежурными, репертуаром и цветами.
+
+    Дочерние строки чистим явно: у relationship'ов не настроен delete-cascade,
+    поэтому ORM вместо удаления просто обнулил бы им date_id и оставил «сирот».
+    """
+    date = db.query(models.DutyDate).filter(models.DutyDate.date_str == date_str).first()
+    if not date:
+        raise ValueError("Дата не найдена")
+    date_id = date.id
+    db.query(models.DutyAssignment).filter(models.DutyAssignment.date_id == date_id).delete(synchronize_session=False)
+    db.query(models.Repertoire).filter(models.Repertoire.date_id == date_id).delete(synchronize_session=False)
+    db.query(models.DateColor).filter(models.DateColor.date_id == date_id).delete(synchronize_session=False)
+    db.query(models.DutyDate).filter(models.DutyDate.id == date_id).delete(synchronize_session=False)
+    db.commit()
+
 def toggle_duty(db: Session, date_str: str, user_name: str, value: bool):
     date = get_or_create_date(db, date_str)
     user = get_user_by_name(db, user_name)
@@ -228,6 +244,21 @@ def clear_pending_changes(db: Session):
         row.value = '[]'
         row.updated_at = func.now()
         db.commit()
+
+
+def set_force_full_sync(db: Session, value: bool = True):
+    """Форсировать полную перезаливку листов на следующей синхронизации.
+
+    Нужно при удалении даты: строки из БД исчезают, и сравнивать updated_at
+    (как делает has_duty_changes) уже не с чем — иначе удаление не доедет до Sheets.
+    """
+    row = db.query(models.SyncMetadata).filter(models.SyncMetadata.key == 'force_full_sync').first()
+    if not row:
+        row = models.SyncMetadata(key='force_full_sync', value='')
+        db.add(row)
+    row.value = str(value).lower()
+    row.updated_at = func.now()
+    db.commit()
 
 
 def set_sync_flag(db: Session, needs_sync: bool = True, triggered_by: str = 'auto', change: str = None):

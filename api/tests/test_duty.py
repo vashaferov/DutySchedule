@@ -144,3 +144,96 @@ def test_clear_pending_changes(client, db):
     assert len(crud.get_pending_changes(db)) == 1
     crud.clear_pending_changes(db)
     assert crud.get_pending_changes(db) == []
+
+
+def test_delete_date_by_admin(client, db):
+    _make_admin(db, "del_admin")
+    client.post("/api/duty/dates", json={
+        "date_str": "20.10.2030", "changer": "del_admin", "pin": "1234"})
+
+    resp = client.delete("/api/duty/dates/20.10.2030?changer=del_admin&pin=1234")
+
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+    assert "20.10.2030" not in client.get("/api/duty/matrix").json()["dates"]
+
+
+def test_delete_date_with_note_urlencoded(client, db):
+    from urllib.parse import quote
+
+    _make_admin(db, "del_admin_note")
+    date_str = "22.10.2030 (утро 10-12)"
+    client.post("/api/duty/dates", json={
+        "date_str": date_str, "changer": "del_admin_note", "pin": "1234"})
+
+    resp = client.delete(
+        f"/api/duty/dates/{quote(date_str, safe='')}?changer=del_admin_note&pin=1234"
+    )
+
+    assert resp.status_code == 200
+    assert date_str not in client.get("/api/duty/matrix").json()["dates"]
+
+
+def test_delete_date_requires_admin(client, db):
+    from app import crud, schemas
+    crud.create_user(db, schemas.UserCreate(name="plain_del", pin="1234"))
+    _make_admin(db, "del_admin_forbid")
+    client.post("/api/duty/dates", json={
+        "date_str": "21.10.2030", "changer": "del_admin_forbid", "pin": "1234"})
+
+    resp = client.delete("/api/duty/dates/21.10.2030?changer=plain_del&pin=1234")
+
+    assert resp.status_code == 403
+    assert "21.10.2030" in client.get("/api/duty/matrix").json()["dates"]
+
+
+def test_delete_unknown_date_returns_404(client, db):
+    _make_admin(db, "del_admin_404")
+
+    resp = client.delete("/api/duty/dates/01.01.1999?changer=del_admin_404&pin=1234")
+
+    assert resp.status_code == 404
+
+
+def test_delete_date_removes_children_and_forces_sync(client, db):
+    from app import crud, schemas
+    from app.models import DutyAssignment, DutyDate, SyncMetadata
+
+    _make_admin(db, "del_admin_children")
+    crud.create_user(db, schemas.UserCreate(name="del_child_user", pin="1234"))
+    date_str = "23.10.2030"
+
+    client.post("/api/duty/dates", json={
+        "date_str": date_str, "changer": "del_admin_children", "pin": "1234"})
+    client.post("/api/duty/toggle", json={
+        "date_str": date_str, "user_name": "del_child_user",
+        "value": True, "changer": "del_admin_children", "pin": "1234"})
+
+    resp = client.delete(f"/api/duty/dates/{date_str}?changer=del_admin_children&pin=1234")
+    assert resp.status_code == 200
+
+    db.rollback()
+    assert db.query(DutyDate).filter(DutyDate.date_str == date_str).count() == 0
+    # Дочерние строки должны быть удалены, а не остаться «сиротами» с date_id = NULL
+    assert db.query(DutyAssignment).filter(DutyAssignment.date_id.is_(None)).count() == 0
+
+    # Удаление не оставляет свежих updated_at, поэтому синхронизацию форсируем
+    forced = db.query(SyncMetadata).filter(SyncMetadata.key == "force_full_sync").first()
+    assert forced is not None
+    assert forced.value == "true"
+
+
+def test_delete_date_records_change(client, db):
+    from app import crud
+
+    _make_admin(db, "del_admin_log")
+    date_str = "24.10.2030"
+    client.post("/api/duty/dates", json={
+        "date_str": date_str, "changer": "del_admin_log", "pin": "1234"})
+    crud.clear_pending_changes(db)
+
+    client.delete(f"/api/duty/dates/{date_str}?changer=del_admin_log&pin=1234")
+
+    db.rollback()
+    changes = crud.get_pending_changes(db)
+    assert any(c["by"] == "del_admin_log" and date_str in c["text"] for c in changes)

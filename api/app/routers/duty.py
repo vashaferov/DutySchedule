@@ -1,5 +1,5 @@
 import re
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import crud, schemas
@@ -47,6 +47,31 @@ def create_date(req: schemas.DutyDateCreateRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=400, detail=str(e))
 
     crud.set_sync_flag(db, True, req.changer, f"добавлена дата {date_str}")
+    return {"success": True, "date_str": date_str}
+
+@router.delete("/dates/{date_str}")
+def delete_date(
+    date_str: str,
+    changer: str = Query(...),
+    pin: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    # Удалять даты может только администратор.
+    if not crud.verify_pin(db, changer, pin) or not crud.is_admin(db, changer):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    date_str = normalize_date_str(date_str)
+    try:
+        crud.delete_date(db, date_str)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Удалённые строки не оставляют нового updated_at, поэтому обычная проверка
+    # изменений в sync не сработает — просим перезалить листы целиком.
+    crud.set_force_full_sync(db, True)
+    crud.set_sync_flag(db, True, changer, f"удалена дата {date_str}")
     return {"success": True, "date_str": date_str}
 
 @router.post("/toggle")
