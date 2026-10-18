@@ -40,6 +40,11 @@ jobs:
           bash -n scripts/backup-db.sh scripts/restore-db.sh scripts/install-backup-cron.sh
           bash tests/scripts/deploy-guards.test.sh
 
+      # nginx-конфиг — единственный файл, опечатка в котором уносит весь сайт,
+      # а не только API. Проверяем его настоящим nginx -t в контейнере.
+      - name: Nginx config check
+        run: bash tests/nginx/check-config.sh
+
       # Установка cron для бэкапов: проверяем, что задача ставится и не
       # дублируется. Реальный crontab не трогаем — он подменён заглушкой.
       - name: Backup cron installer test
