@@ -29,7 +29,7 @@ def create_user(name: str = Query(...), pin: str = Query(...), role: str = Query
     if not crud.verify_pin(db, admin_name, admin_pin) or not crud.is_admin(db, admin_name):
         raise HTTPException(status_code=403, detail="Admin access required")
     try:
-        user = crud.create_user(db, name, pin, role)
+        user = crud.create_user(db, schemas.UserCreate(name=name, pin=pin))
         return {"success": True, "user": {"name": user.name, "role": user.role}}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -26,7 +26,7 @@ def update_song_text(name: str, new_text: str = Query(...), changer: str = Query
     try:
         song = crud.update_song_text(db, name, new_text)
         crud.set_sync_flag(db, True, changer)
-        return {"success": True, "song": song}
+        return {"success": True, "song": schemas.SongResponse.model_validate(song)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

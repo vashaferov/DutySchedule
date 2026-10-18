@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import duty, songs, users, auth, repertoire, sync, sync_history
@@ -5,9 +7,17 @@ from .routers import duty, songs, users, auth, repertoire, sync, sync_history
 app = FastAPI(title="Duty Schedule API", version="1.0.0")
 
 # CORS – разрешаем запросы с фронтенда
+# Фронтенд (статика) и API отдаются одним nginx на mediahlg.ru,
+# поэтому запросы идут с того же origin. Список настраивается через CORS_ORIGINS.
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "https://mediahlg.ru").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # в продакшене укажите конкретный домен
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,28 +1,18 @@
+import bcrypt
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
-from passlib.context import CryptContext
+from sqlalchemy import func
 from . import models, schemas
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ---------- Users ----------
 def get_user_by_name(db: Session, name: str):
     return db.query(models.User).filter(models.User.name == name).first()
-
-def create_user(db: Session, user: schemas.UserCreate):
-    hashed = pwd_context.hash(user.pin)
-    db_user = models.User(name=user.name, pin_hash=hashed)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
 
 def verify_pin(db: Session, name: str, pin: str) -> bool:
     user = get_user_by_name(db, name)
     if not user or not user.pin_hash:
         return False
     try:
-        return pwd_context.verify(pin, user.pin_hash)
+        return bcrypt.checkpw(pin.encode('utf-8'), user.pin_hash.encode('utf-8'))
     except Exception:
         return False
 
@@ -120,21 +110,20 @@ def update_user_pin(db: Session, name: str, new_pin: str):
     user = get_user_by_name(db, name)
     if not user:
         raise ValueError("User not found")
-    user.pin_hash = pwd_context.hash(new_pin)
+    user.pin_hash = bcrypt.hashpw(new_pin.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     db.commit()
     return user
 
-def create_user(db: Session, name: str, pin: str, role: str = 'user'):
-    # Проверяем, существует ли пользователь
-    existing = db.query(models.User).filter(models.User.name == name).first()
+def create_user(db: Session, user: schemas.UserCreate):
+    existing = db.query(models.User).filter(models.User.name == user.name).first()
     if existing:
         raise ValueError("User already exists")
-    hashed = pwd_context.hash(pin)
-    user = models.User(name=name, pin_hash=hashed, role=role)
-    db.add(user)
+    hashed = bcrypt.hashpw(user.pin.encode('utf-8'), bcrypt.gensalt())
+    db_user = models.User(name=user.name, pin_hash=hashed.decode('utf-8'), role='user')
+    db.add(db_user)
     db.commit()
-    db.refresh(user)
-    return user
+    db.refresh(db_user)
+    return db_user
 
 def delete_user(db: Session, name: str):
     user = db.query(models.User).filter(models.User.name == name).first()

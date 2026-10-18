@@ -1,2 +1,25 @@
+# Секреты и локальные данные
 .env
+.env.*
+!.env.example
 credentials.json
+sync/credentials.json
+
+# TLS-материалы certbot (приватные ключи домена)
+certbot-etc/
+certbot-var/
+certbot-www/
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Локальные БД и логи
+test.db
+*.log
+*.sqlite3

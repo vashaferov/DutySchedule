@@ -1,0 +1,8 @@
+# Секреты не должны попадать в образ: Dockerfile делает COPY . .
+credentials.json
+*.bak-*
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo

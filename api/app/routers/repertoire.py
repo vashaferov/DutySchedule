@@ -30,11 +30,13 @@ def delete_song_from_repertoire(date_str: str, song_name: str, changer: str = Qu
         if date_str not in data:
             raise HTTPException(status_code=404, detail="Date not found")
         songs = data[date_str]["songs"]
-        if song_name not in [s["name"] for s in songs]:
+        if not any(s["name"] == song_name for s in songs):
             raise HTTPException(status_code=404, detail="Song not found in repertoire")
         new_songs = [s["name"] for s in songs if s["name"] != song_name]
         crud.update_repertoire_for_date(db, date_str, new_songs)
         crud.set_sync_flag(db, True, changer)
         return {"success": True}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

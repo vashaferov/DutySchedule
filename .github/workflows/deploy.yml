@@ -4,8 +4,34 @@ on:
   push:
     branches: main
 
+permissions:
+  contents: read
+
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r api/requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run tests
+        env:
+          DATABASE_URL: sqlite:///./test.db
+          SECRET_KEY: test-secret
+        run: |
+          pytest api/tests -v
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -61,6 +87,7 @@ jobs:
             fi
 
             echo "Creating .env file..."
+            umask 077
             cat > ~/duty/.env << EOF
             DB_NAME=${{ secrets.DB_NAME }}
             DB_USER=${{ secrets.DB_USER }}
@@ -70,6 +97,7 @@ jobs:
             GOOGLE_SHEETS_CREDENTIALS=${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
             DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/${{ secrets.DB_NAME }}
             EOF
+            chmod 600 ~/duty/.env
 
             echo "Pulling images..."
             $DOCKER_COMPOSE pull

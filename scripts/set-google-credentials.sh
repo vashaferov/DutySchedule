@@ -33,6 +33,27 @@ die() { echo "ОШИБКА: $*" >&2; exit 1; }
 
 echo "Каталог приложения: $APP_DIR"
 
+# --- 0. Частая ловушка: на месте файла bind-mount'а лежит КАТАЛОГ ------------
+# Docker создаёт каталог, если исходного файла не было при первом запуске.
+# Записать в него ключ нельзя — отсюда 'install: Permission denied'.
+if [ -d "$CRED_FILE" ]; then
+  cat >&2 <<MSG
+ОШИБКА: $CRED_FILE — это КАТАЛОГ, а не файл.
+
+Причина: в docker-compose.yml этот путь смонтирован как bind-mount, а файла на
+сервере не было (он в .gitignore), поэтому Docker создал на его месте каталог.
+
+Исправление:
+  cd $APP_DIR
+  docker compose stop sync          # или: docker-compose stop sync
+  ls -la sync/credentials.json      # убедиться, что каталог пуст
+  rmdir sync/credentials.json       # именно rmdir — он не удалит каталог с данными
+  bash $0 $KEY_JSON --restart
+
+MSG
+  exit 1
+fi
+
 # --- 1. Проверяем ключ и нормализуем его -------------------------------------
 # BOM в начале файла ломает и python-приложение, и base64-декодирование,
 # поэтому здесь ключ перезаписывается в чистый UTF-8 без BOM.
@@ -125,8 +146,9 @@ fi
 if [ "$RESTART" = "--restart" ]; then
   echo
   echo "Перезапускаю sync (аутентификация происходит при старте контейнера)..."
-  ( cd "$APP_DIR" && docker compose up -d --force-recreate sync )
-  echo "Логи: docker compose logs --tail=50 sync"
+  if command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"; else DC="docker compose"; fi
+  ( cd "$APP_DIR" && $DC up -d --force-recreate sync )
+  echo "Логи: $DC logs --tail=50 sync"
 fi
 
 cat <<'NEXT'

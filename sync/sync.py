@@ -35,7 +35,9 @@ else:
     except Exception:
         creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
 
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+# Только Sheets. Раньше здесь был auth/drive — он давал доступ ко ВСЕМУ, что
+# расшарено на сервисный аккаунт, а не только к нужной таблице.
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets"]
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
