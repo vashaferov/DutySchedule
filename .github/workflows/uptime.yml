@@ -1,0 +1,78 @@
+name: Uptime check
+
+# Внешняя проверка доступности сайта и API.
+#
+# Почему снаружи: cron на самом сервере не заметит, что сервер лежит, — он и сам
+# тогда не запустится. Раннер GitHub живёт отдельно, поэтому упавший VDS он
+# увидит. Если проверка падает, GitHub присылает письмо владельцу репозитория:
+# так об отказе узнаём мы, а не пользователи (раньше узнавали именно от них).
+#
+# Как этим пользоваться:
+#   * расписание — каждые 15 минут; GitHub может задержать старт при нагрузке,
+#     для «сайт лежит» это некритично;
+#   * запустить вручную можно из вкладки Actions → Uptime check → Run workflow;
+#   * через 60 дней без коммитов GitHub отключает расписание — если репозиторий
+#     надолго замер, проверку нужно включить заново (либо перевести её на
+#     бесплатный внешний сервис вроде UptimeRobot, который умеет ещё и SMS).
+#
+# Секретов здесь нет: обе ручки публичные.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Сайт и API отвечают
+        run: |
+          set -uo pipefail
+          fail=0
+
+          # Страница целиком: если отвалился nginx или фронтенд — увидим здесь.
+          if curl -fsS --max-time 20 -o /dev/null https://mediahlg.ru/; then
+            echo "✅ https://mediahlg.ru/ отвечает"
+          else
+            echo "❌ https://mediahlg.ru/ не отвечает"
+            fail=1
+          fi
+
+          # Та же ручка, которую опрашивает docker healthcheck у api.
+          body="$(curl -fsS --max-time 20 https://mediahlg.ru/api/health || true)"
+          echo "api/health → ${body:-<пусто>}"
+          if printf '%s' "$body" | grep -q '"status"'; then
+            echo "✅ /api/health отвечает"
+          else
+            echo "❌ /api/health не отдал ожидаемый JSON"
+            fail=1
+          fi
+
+          exit "$fail"
+
+      - name: Сертификат не истекает
+        run: |
+          set -uo pipefail
+
+          end="$(echo | openssl s_client -servername mediahlg.ru -connect mediahlg.ru:443 2>/dev/null \
+                 | openssl x509 -noout -enddate | cut -d= -f2)"
+          echo "сертификат действителен до: ${end:-<не удалось прочитать>}"
+
+          # certbot продлевает сертификат сам, но если продление сломается молча,
+          # об этом иначе узнают только браузеры пользователей.
+          if [ -z "$end" ]; then
+            echo "❌ не удалось прочитать сертификат"
+            exit 1
+          fi
+
+          days=$(( ( $(date -d "$end" +%s) - $(date +%s) ) / 86400 ))
+          echo "осталось дней: $days"
+          if [ "$days" -lt 10 ]; then
+            echo "❌ сертификат истекает менее чем через 10 дней — проверьте certbot"
+            exit 1
+          fi
+          echo "✅ сертификат в порядке"

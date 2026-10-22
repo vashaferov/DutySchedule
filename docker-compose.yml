@@ -1,3 +1,21 @@
+# Логи всех сервисов: одно ограничение на всех, чтобы не забыть новый сервис.
+#
+# По умолчанию Docker (драйвер json-file) пишет логи без ограничения размера:
+# сервис, который начал сыпать ошибками, за пару дней занимает весь диск.
+# Держим по 3 файла на 10 МБ на контейнер.
+#
+# Важно: эти логи живут внутри контейнера и исчезают, когда контейнер
+# пересоздают, — а деплой делает `up -d --force-recreate` при каждом пуше.
+# Именно поэтому логов nginx за 17.10.2026 уже не было. Логи, нужные для разбора
+# происшествий, поэтому пишутся ещё и на хост: у nginx каталог /var/log/nginx
+# смонтирован в ./logs/nginx (см. том у сервиса nginx), а ротацию делает
+# scripts/rotate-nginx-logs.sh по cron.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # База данных PostgreSQL
   postgres:
@@ -16,6 +34,7 @@ services:
     networks:
       - duty_network
     restart: unless-stopped
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
@@ -36,12 +55,26 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-https://mediahlg.ru}
       # Ключ Google Sheets здесь НЕ нужен: api его не использует.
       # Он передаётся только в сервисы sync и migrate — не расширяем поверхность утечки.
+      # Ограничение перебора PIN (см. api/app/ratelimit.py). Значения по умолчанию
+      # подходят как есть; менять — в .env, без правки кода.
+      LOGIN_MAX_FAILURES_PER_USER: ${LOGIN_MAX_FAILURES_PER_USER:-5}
+      LOGIN_MAX_FAILURES_PER_IP: ${LOGIN_MAX_FAILURES_PER_IP:-60}
+      LOGIN_WINDOW_MINUTES: ${LOGIN_WINDOW_MINUTES:-15}
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - duty_network
     restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      # Та же ручка, что опрашивают деплой и внешний аптайм-чек. curl/wget в
+      # образе нет, поэтому проверяем через urllib.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     # порт не публикуется, доступен только через Nginx
 
   # Синхронизатор с Google Sheets (фоновый процесс)
@@ -63,6 +96,15 @@ services:
     networks:
       - duty_network
     restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      # GET /health из http_server.py. Проверяем, что сам сервер отвечает;
+      # ошибки автосинка видны в логах сервиса.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3).status == 200 else 1)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     # credentials.json НЕ монтируем: ключ берётся из GOOGLE_SHEETS_CREDENTIALS (.env),
     # а bind-mount отсутствующего файла Docker превращает в КАТАЛОГ и ломает запуск.
     # Файл sync/credentials.json остаётся только фолбэком для локального запуска.
@@ -82,6 +124,11 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:rw
       - ./frontend:/usr/share/nginx/html:ro
+      # Логи nginx — на хост. В образе /var/log/nginx/access.log и error.log это
+      # симлинки на stdout/stderr, поэтому логи исчезают при пересоздании
+      # контейнера: именно так пропали логи за 17.10.2026. Ротацию делает
+      # scripts/rotate-nginx-logs.sh (cron ставит install-backup-cron.sh).
+      - ./logs/nginx:/var/log/nginx
       - ./certbot-etc:/etc/letsencrypt
       - ./certbot-var:/var/lib/letsencrypt
       - ./certbot-www:/var/www/certbot  
@@ -94,6 +141,16 @@ services:
     networks:
       - duty_network
     restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      # curl/wget в образе нет, python3 есть (на нём же работает certbot).
+      # /healthz — отдельная ручка без записи в access-лог; проверяем именно
+      # HTTPS, поэтому цепочку сертификата для 127.0.0.1 отключаем.
+      test: ["CMD", "python3", "-c", "import ssl,urllib.request,sys; ctx=ssl._create_unverified_context(); sys.exit(0 if urllib.request.urlopen('https://127.0.0.1/healthz', timeout=3, context=ctx).status == 200 else 1)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   # Ручная утилита: импорт данных из Google Sheets (первичная заливка/восстановление).
   #
@@ -123,6 +180,7 @@ services:
     networks:
       - duty_network
     restart: "no"
+    logging: *default-logging
 
 networks:
   duty_network:

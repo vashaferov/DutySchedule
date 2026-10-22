@@ -24,6 +24,14 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
 
+    # Проверка живости для docker healthcheck (см. docker-compose.yml).
+    # Отдаём 200 и намеренно не пишем в access-лог: иначе опрос раз в минуту
+    # забивает журнал, который мы теперь храним для разбора происшествий.
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
     # Статика фронтенда
     location / {
         root /usr/share/nginx/html;
@@ -50,8 +58,11 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-        add_header Pragma "no-cache";
-        add_header Expires "0";
+        # `always` и здесь: без него заголовки не попадают на ответы об ошибке
+        # (например 502, когда API недоступен), и браузер может закэшировать
+        # текст ошибки вместо ответа API.
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
     }
 }

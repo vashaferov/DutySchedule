@@ -1,16 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from ..database import get_db
-from .. import crud, models, schemas
+from .. import crud, models, ratelimit, schemas
 from ..security import create_token, get_current_user, require_admin
 
 router = APIRouter()
 
 @router.post("/login")
-def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
+def login(req: schemas.LoginRequest, request: Request, db: Session = Depends(get_db)):
     """Единственное место, куда клиент присылает PIN. В ответ уходит токен."""
+    ip = ratelimit.client_ip(request)
+    # Лимит проверяем до сверки PIN: иначе перебор четырёхзначного PIN ничего
+    # не стоит — правильность PIN узнаётся из ответа, а попытки не считаются.
+    ratelimit.check(db, req.name, ip)
     if not crud.verify_pin(db, req.name, req.pin):
+        ratelimit.record_failure(db, req.name, ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    ratelimit.clear_failures(db, req.name)
     user = crud.get_user_by_name(db, req.name)
     return {
         "success": True,

@@ -35,15 +35,23 @@ jobs:
       - name: Frontend XSS checks
         run: node tests/frontend/xss.test.js
 
-      - name: Bash syntax checks
+      - name: Bash syntax and script checks
         run: |
-          bash -n scripts/backup-db.sh scripts/restore-db.sh scripts/install-backup-cron.sh
+          bash -n scripts/backup-db.sh scripts/restore-db.sh scripts/install-backup-cron.sh scripts/rotate-nginx-logs.sh scripts/rollback.sh
           bash tests/scripts/deploy-guards.test.sh
+          bash tests/scripts/rotate-nginx-logs.test.sh
+          bash tests/scripts/rollback.test.sh
 
       # nginx-конфиг — единственный файл, опечатка в котором уносит весь сайт,
       # а не только API. Проверяем его настоящим nginx -t в контейнере.
       - name: Nginx config check
         run: bash tests/nginx/check-config.sh
+
+      # docker-compose.yml — второй такой файл: ошибка в нём ломает деплой
+      # целиком. Проверяем, что он разбирается и что у сервисов есть healthcheck
+      # и ограничение логов (иначе новый сервис тихо останется без них).
+      - name: Docker Compose config check
+        run: bash tests/compose/check-compose.sh
 
       # Установка cron для бэкапов: проверяем, что задача ставится и не
       # дублируется. Реальный crontab не трогаем — он подменён заглушкой.
@@ -155,6 +163,15 @@ jobs:
             EOF
             chmod 600 ~/duty/.env
 
+            # Бэкап БД ДО пересоздания контейнеров. Откат кода не возвращает
+            # данные: если новая версия испортит записи, нужен дамп на момент
+            # деплоя, а не вчерашний из cron. На первом деплое контейнера ещё
+            # нет — шаг пропускается (том pgdata создаётся ниже).
+            if [ "$(docker inspect -f '{{.State.Running}}' duty_postgres 2>/dev/null)" = "true" ]; then
+                echo "Бэкап БД перед деплоем..."
+                bash ~/duty/scripts/backup-db.sh
+            fi
+
             echo "Pulling images..."
             $DOCKER_COMPOSE pull
 
@@ -175,6 +192,27 @@ jobs:
             done
             if [ "$api_ready" != "1" ]; then
                 echo "❌ API не поднялся за 60 секунд. Логи: $DOCKER_COMPOSE logs --tail=50 api"
+                exit 1
+            fi
+
+            # nginx — второй файл, ошибка в котором роняет сайт целиком, хотя API
+            # при этом жив. `up -d` не замечает, что nginx ушёл в перезапуск из-за
+            # плохого конфига, поэтому проверяем HTTPS изнутри контейнера.
+            # curl/wget в образе нет, python3 есть (на нём работает certbot).
+            # /healthz есть и в старом конфиге (отдаст index.html с кодом 200),
+            # так что проверка не сломает откат на версию до этой ручки.
+            nginx_ready=0
+            for i in $(seq 1 30); do
+                if $DOCKER_COMPOSE exec -T nginx python3 -c "import ssl,urllib.request,sys; ctx=ssl._create_unverified_context(); sys.exit(0 if urllib.request.urlopen('https://127.0.0.1/healthz', timeout=2, context=ctx).status == 200 else 1)" &>/dev/null; then
+                    nginx_ready=1
+                    echo "✅ nginx отвечает по HTTPS"
+                    break
+                fi
+                sleep 2
+            done
+            if [ "$nginx_ready" != "1" ]; then
+                echo "❌ nginx не отвечает по HTTPS. Логи: $DOCKER_COMPOSE logs --tail=50 nginx"
+                echo "   Откат: bash ~/duty/scripts/rollback.sh <точка отката> (список — без аргумента)"
                 exit 1
             fi
 
@@ -201,5 +239,10 @@ jobs:
             # диска = потеря всех данных. Как восстановиться — RUNBOOK.md.
             # Логика в отдельном скрипте: у него нет ограничений script_stop.
             bash ~/duty/scripts/install-backup-cron.sh
+
+            # После каждого деплоя остаётся предыдущий образ без тега (up --build
+            # собирает новый). Убираем только висячие образы: те, что нужны
+            # запущенным контейнерам, не трогаются.
+            docker image prune -f
 
             echo "✅ Deployment completed successfully."

@@ -705,9 +705,16 @@
               modal.style.display = 'none';
               setUser(name, data.token, data.role === 'admin');
             } else {
-              error.textContent = resp.status === 401
-                ? 'Неверный PIN-код'
-                : 'Не удалось войти, попробуйте ещё раз';
+              // 429 приходит от ограничения попыток входа: сервер сам говорит,
+              // сколько ждать, — показываем его текст.
+              let message = 'Не удалось войти, попробуйте ещё раз';
+              if (resp.status === 401) message = 'Неверный PIN-код';
+              if (resp.status === 429) {
+                message = typeof data.detail === 'string'
+                  ? data.detail
+                  : 'Слишком много неудачных попыток входа, попробуйте позже';
+              }
+              error.textContent = message;
               error.style.display = 'block';
               pinInput.value = '';
               pinInput.focus();

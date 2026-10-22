@@ -52,6 +52,16 @@ def _sync_loop():
         time.sleep(SYNC_INTERVAL)
 
 
+@app.get("/health")
+def health():
+    """Живость для docker healthcheck.
+
+    Проверяем, что сервер отвечает; ошибки автосинка видны в логах сервиса.
+    Ручка без авторизации, но и порт опубликован только на 127.0.0.1.
+    """
+    return {"status": "ok"}
+
+
 @app.post("/run")
 def run_sync(authorization: Optional[str] = Header(default=None)):
     # Раньше здесь проверялся admin_pin из query. Теперь API присылает токен

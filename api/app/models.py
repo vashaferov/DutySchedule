@@ -13,6 +13,20 @@ class User(Base):
     duty_assignments = relationship("DutyAssignment", back_populates="user")
 
 
+class LoginAttempt(Base):
+    """Неудачная попытка входа.
+
+    Нужна, чтобы ограничивать перебор PIN (он четырёхзначный) и чтобы при разборе
+    инцидента было видно, что вход в самом деле пытались подобрать. Строки старше
+    окна удаляются при каждой новой неудаче — таблица не растёт бесконечно.
+    """
+    __tablename__ = "login_attempts"
+    id = Column(Integer, primary_key=True)
+    username = Column(String(100), nullable=False, index=True)
+    ip = Column(String(64), nullable=False, index=True)
+    attempted_at = Column(DateTime, nullable=False, index=True)
+
+
 class DutyDate(Base):
     __tablename__ = "duty_dates"
     id = Column(Integer, primary_key=True)

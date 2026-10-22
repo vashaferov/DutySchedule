@@ -132,6 +132,9 @@ STUB
     # пользователей, как настоящий psql -tAc.
     cat > "$dir/docker" <<'STUB'
 #!/usr/bin/env bash
+# Эхо вызова — по нему тест проверяет, что деплой дошёл до нужных команд.
+# Пишем в stderr: на stdout отвечает заглушка postgres (см. ниже).
+echo "docker $*" >&2
 for arg in "$@"; do
     if [ "$arg" = "postgres" ]; then
         printf '%s\n' "${STUB_USERS_COUNT:-11}"
@@ -174,9 +177,9 @@ run_scenario() {
     printf 'services: {}\n' > "$home/duty/docker-compose.yml"
     printf 'services: {}\n' > "$fixture/docker-compose.yml"
     cp "$repo_root/scripts/backup-db.sh" "$repo_root/scripts/install-backup-cron.sh" \
-       "$home/duty/scripts/"
+       "$repo_root/scripts/rotate-nginx-logs.sh" "$home/duty/scripts/"
     cp "$repo_root/scripts/backup-db.sh" "$repo_root/scripts/install-backup-cron.sh" \
-       "$fixture/scripts/"
+       "$repo_root/scripts/rotate-nginx-logs.sh" "$fixture/scripts/"
 
     make_stubs "$bin"
 
@@ -196,6 +199,8 @@ check "0" "$rc" "скрипт дошёл до конца"
 contains "$work/live-users.log" "Deployment completed successfully" "финальное сообщение"
 contains "$work/live-users.log" "База инициализирована, пользователей: 11" "отчёт по числу пользователей"
 contains "$work/live-users.log" "Using Docker Compose" "команда compose определена"
+contains "$work/live-users.log" "docker image prune -f" "старые образы чистятся после деплоя"
+contains "$work/live-users/tables/crontab" "rotate-nginx-logs.sh" "ротация логов поставлена в cron"
 
 echo "3. Пустая база (предупреждение вместо молчаливого пропуска)"
 rc="$(run_scenario empty-db 0 yes)"

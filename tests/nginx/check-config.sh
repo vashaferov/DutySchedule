@@ -93,3 +93,82 @@ echo "✅ сломанный конфиг отловлен"
 
 echo
 echo "✅ конфиг nginx проходит nginx -t"
+
+# 3. Ручка /healthz: её опрашивает healthcheck контейнера nginx (см.
+# docker-compose.yml). Проверяем, что она действительно отвечает, что SPA не
+# пострадал и что опрос не пишется в access-лог — журнал мы держим на хосте
+# именно для разбора происшествий, и опрос раз в минуту его бы забил.
+if ! command -v curl >/dev/null 2>&1; then
+    echo "❌ для проверки /healthz нужен curl" >&2
+    exit 1
+fi
+
+runtime_conf="$work/nginx-runtime.conf"
+cat > "$runtime_conf" <<EOF
+worker_processes 1;
+error_log stderr warn;
+pid /tmp/ngx/nginx.pid;
+events { worker_connections 32; }
+http {
+    access_log /tmp/ngx/access.log combined;
+    include /check/default.conf;
+}
+EOF
+
+echo
+echo "3. Ручка /healthz (её опрашивает docker healthcheck)"
+container="duty_nginx_check_$$"
+MSYS_NO_PATHCONV=1 docker run --rm -d --name "$container" \
+  --add-host api:127.0.0.1 \
+  -p "127.0.0.1::443" \
+  -v "$(host_path "$work"):/check:ro" \
+  --entrypoint sh "$image" \
+  -c "mkdir -p /tmp/ngx && nginx -c /check/nginx-runtime.conf -p /tmp/ngx -g 'daemon off;'" >/dev/null
+trap 'docker rm -f "$container" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
+
+port=""
+for _ in $(seq 1 30); do
+  port=$(docker port "$container" 443/tcp 2>/dev/null | head -n1 | awk -F: '{print $NF}')
+  if [ -n "$port" ] && curl -ksf -o /dev/null "https://127.0.0.1:$port/healthz" 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+if [ -z "$port" ]; then
+  echo "❌ контейнер не поднялся, порт не определён" >&2
+  docker logs "$container" 2>&1 | tail -20 >&2
+  exit 1
+fi
+
+body=$(curl -ks "https://127.0.0.1:$port/healthz")
+if [ "$body" = "ok" ]; then
+  echo "✅ /healthz отвечает 200 ok"
+else
+  echo "❌ /healthz вернул '$body' вместо 'ok'" >&2
+  exit 1
+fi
+
+spa_code=$(curl -ks -o /dev/null -w '%{http_code}' "https://127.0.0.1:$port/no-such-page")
+if [ "$spa_code" = "200" ]; then
+  echo "✅ SPA-фолбэк не сломан"
+else
+  echo "❌ SPA-фолбэк отвечает $spa_code" >&2
+  exit 1
+fi
+
+# Обычный запрос — чтобы убедиться, что access-лог вообще пишется.
+curl -ks -o /dev/null "https://127.0.0.1:$port/"
+
+if MSYS_NO_PATHCONV=1 docker exec "$container" grep -q '/healthz' /tmp/ngx/access.log; then
+  echo "❌ /healthz попал в access-лог" >&2
+  exit 1
+fi
+if ! MSYS_NO_PATHCONV=1 docker exec "$container" grep -q 'GET / ' /tmp/ngx/access.log; then
+  echo "❌ access-лог пуст — проверка выше ничего не значит" >&2
+  exit 1
+fi
+echo "✅ /healthz не пишется в access-лог, обычные запросы — пишутся"
+
+echo
+echo "✅ конфиг nginx в порядке"

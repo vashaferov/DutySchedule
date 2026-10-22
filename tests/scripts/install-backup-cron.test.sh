@@ -59,6 +59,7 @@ export HOME="$work/home"
 mkdir -p "$HOME/duty/scripts" "$HOME/duty-backups"
 cp "$here/scripts/install-backup-cron.sh" "$HOME/duty/scripts/"
 cp "$here/scripts/backup-db.sh" "$HOME/duty/scripts/"
+cp "$here/scripts/rotate-nginx-logs.sh" "$HOME/duty/scripts/"
 
 install_script="$HOME/duty/scripts/install-backup-cron.sh"
 
@@ -67,17 +68,20 @@ rc=0
 PATH="$work:$PATH" "$BASH_BIN" "$install_script" > "$work/out1" 2>&1 || rc=$?
 check "0" "$rc" "код возврата 0"
 check "1" "$(count_in_file 'duty-db-backup' "$FAKE_CRONTAB_TABLE")" "задача добавлена ровно один раз"
-check "1" "$(count_in_file '^15 3 \* \* \*' "$FAKE_CRONTAB_TABLE")" "расписание 03:15"
+check "2" "$(count_in_file '^15 3 \* \* \*' "$FAKE_CRONTAB_TABLE")" "обе задачи по расписанию 03:15"
 check "1" "$(count_in_file 'backup-db.sh' "$FAKE_CRONTAB_TABLE")" "вызывается backup-db.sh"
+check "1" "$(count_in_file 'rotate-nginx-logs.sh' "$FAKE_CRONTAB_TABLE")" "вызывается rotate-nginx-logs.sh"
+check "1" "$(count_in_file 'duty-nginx-logs' "$FAKE_CRONTAB_TABLE")" "метка ротации проставлена"
 
 echo "2. Повторный запуск: чужая задача цела, дубликата нет"
 echo '0 5 * * * /usr/bin/other-job' >> "$FAKE_CRONTAB_TABLE"
 rc=0
 PATH="$work:$PATH" "$BASH_BIN" "$install_script" > "$work/out2" 2>&1 || rc=$?
 check "0" "$rc" "код возврата 0"
-check "1" "$(count_in_file 'duty-db-backup' "$FAKE_CRONTAB_TABLE")" "дубликат не появился"
+check "1" "$(count_in_file 'duty-db-backup' "$FAKE_CRONTAB_TABLE")" "дубликат бэкапа не появился"
+check "1" "$(count_in_file 'duty-nginx-logs' "$FAKE_CRONTAB_TABLE")" "дубликат ротации не появился"
 check "1" "$(count_in_file 'other-job' "$FAKE_CRONTAB_TABLE")" "чужая задача сохранилась"
-check "2" "$(wc -l < "$FAKE_CRONTAB_TABLE" | tr -d ' ')" "в таблице ровно 2 задачи"
+check "3" "$(wc -l < "$FAKE_CRONTAB_TABLE" | tr -d ' ')" "в таблице ровно 3 задачи"
 
 echo "3. Нет crontab — только предупреждение, деплой не роняем"
 # PATH без crontab, но с dirname: скрипт должен дойти до проверки crontab.
@@ -86,15 +90,17 @@ cp "$(command -v dirname)" "$work/no-crontab/dirname"
 rc=0
 PATH="$work/no-crontab" "$BASH_BIN" "$install_script" > "$work/out3" 2>&1 || rc=$?
 check "0" "$rc" "код возврата 0"
-check "1" "$(count_in_file 'Бэкапы не настроены' "$work/out3")" "предупреждение выведено"
+check "1" "$(count_in_file 'не настроены' "$work/out3")" "предупреждение выведено"
 
-echo "4. Рядом нет backup-db.sh — тоже только предупреждение"
+echo "4. Рядом нет ни бэкап-скрипта, ни ротации — тоже только предупреждение"
 mv "$HOME/duty/scripts/backup-db.sh" "$work/backup-db.sh"
+mv "$HOME/duty/scripts/rotate-nginx-logs.sh" "$work/rotate-nginx-logs.sh"
 rc=0
 PATH="$work:$PATH" "$BASH_BIN" "$install_script" > "$work/out4" 2>&1 || rc=$?
 check "0" "$rc" "код возврата 0"
-check "1" "$(count_in_file 'Бэкапы не настроены' "$work/out4")" "предупреждение выведено"
+check "1" "$(count_in_file 'не настроены' "$work/out4")" "предупреждение выведено"
 mv "$work/backup-db.sh" "$HOME/duty/scripts/backup-db.sh"
+mv "$work/rotate-nginx-logs.sh" "$HOME/duty/scripts/rotate-nginx-logs.sh"
 
 echo
 if [ "$failures" -eq 0 ]; then
