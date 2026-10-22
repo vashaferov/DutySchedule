@@ -26,7 +26,10 @@
 
 set -euo pipefail
 
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+# Стандартные каталоги добавляем в конец: cron даёт урезанный PATH, но текущий
+# PATH должен остаться первым — в тестах там заглушка docker, иначе вызовы
+# уходят в настоящий docker и тест падает на CI.
+export PATH="${PATH:-}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 COMPOSE_DIR="${COMPOSE_DIR:-$HOME/duty}"
 

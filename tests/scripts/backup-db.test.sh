@@ -13,6 +13,9 @@
 #
 # Запуск: bash tests/scripts/backup-db.test.sh
 
+# Тест должен переживать неуспешные команды вне `if`: его могут запустить как
+# `bash -e`, и тогда пустой `ls` обрывает весь прогон. Поэтому все проверки
+# «файла нет» идут через хелперы с `|| true`.
 set -uo pipefail
 
 BASH_BIN="$(command -v bash)"
@@ -34,7 +37,12 @@ check() {
 }
 
 count_backups() {
-    ls "$BACKUP_DIR"/duty-*.dump.gz 2>/dev/null | wc -l | tr -d ' '
+    # `|| true`: при запуске под `bash -e` пустой ls иначе обрывает тест.
+    { ls "$BACKUP_DIR"/duty-*.dump.gz 2>/dev/null || true; } | wc -l | tr -d ' '
+}
+
+count_parts() {
+    { ls "$BACKUP_DIR"/*.part 2>/dev/null || true; } | wc -l | tr -d ' '
 }
 
 mkdir -p "$work/bin" "$work/home"
@@ -90,7 +98,7 @@ rm -rf "$BACKUP_DIR"
 rc="$(run_backup)"
 check "0" "$rc" "код возврата 0"
 check "1" "$(count_backups)" "создан ровно один файл .dump.gz"
-dump="$(ls "$BACKUP_DIR"/duty-*.dump.gz 2>/dev/null | head -n1)"
+dump="$(ls "$BACKUP_DIR"/duty-*.dump.gz 2>/dev/null | head -n1 || true)"
 if [ -n "$dump" ] && gzip -t "$dump" 2>/dev/null; then
     echo "  ok: файл действительно gzip"
 else
@@ -103,8 +111,8 @@ else
     echo "  FAIL: внутри дампа нет PGDMP"
     failures=$((failures + 1))
 fi
-check "600" "$(stat -c '%a' "$dump" 2>/dev/null)" "права на дамп 600"
-check "0" "$(ls "$BACKUP_DIR"/*.part 2>/dev/null | wc -l | tr -d ' ')" "временный .part не остался"
+check "600" "$(stat -c '%a' "$dump" 2>/dev/null || true)" "права на дамп 600"
+check "0" "$(count_parts)" "временный .part не остался"
 
 echo "2. pg_dump упал: код 1, готового файла нет"
 BACKUP_DIR="$work/backups-fail"
@@ -112,7 +120,7 @@ rm -rf "$BACKUP_DIR"
 rc="$(run_backup STUB_PGDUMP_FAIL=1)"
 check "1" "$rc" "код возврата 1"
 check "0" "$(count_backups)" "файл не создан"
-check "0" "$(ls "$BACKUP_DIR"/*.part 2>/dev/null | wc -l | tr -d ' ')" "временный .part удалён"
+check "0" "$(count_parts)" "временный .part удалён"
 
 echo "3. Контейнер не запущен: понятная ошибка, код 1"
 BACKUP_DIR="$work/backups-stopped"

@@ -18,8 +18,11 @@
 
 set -euo pipefail
 
-# cron даёт урезанный PATH — docker иначе не найдётся.
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+# cron даёт урезанный PATH — стандартные каталоги иначе не найдутся.
+# Текущий PATH оставляем первым: в тестах там заглушка docker, и она должна
+# выигрывать у настоящего /usr/bin/docker (иначе тест ходит в реальный докер
+# и падает на CI).
+export PATH="${PATH:-}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 CONTAINER="${DB_CONTAINER:-duty_postgres}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/duty-backups}"

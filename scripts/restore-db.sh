@@ -12,7 +12,8 @@
 
 set -euo pipefail
 
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+# Стандартные каталоги в конец, текущий PATH — первым (см. backup-db.sh).
+export PATH="${PATH:-}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 CONTAINER="${DB_CONTAINER:-duty_postgres}"
 ENV_FILE="${ENV_FILE:-$HOME/duty/.env}"
