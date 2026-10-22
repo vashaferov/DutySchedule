@@ -40,6 +40,7 @@ jobs:
           bash -n scripts/backup-db.sh scripts/restore-db.sh scripts/install-backup-cron.sh scripts/rotate-nginx-logs.sh scripts/rollback.sh
           bash tests/scripts/deploy-guards.test.sh
           bash tests/scripts/rotate-nginx-logs.test.sh
+          bash tests/scripts/backup-db.test.sh
           bash tests/scripts/rollback.test.sh
 
       # nginx-конфиг — единственный файл, опечатка в котором уносит весь сайт,

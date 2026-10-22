@@ -60,7 +60,14 @@ trap cleanup EXIT
 
 log "Дамп базы $DB_NAME из контейнера $CONTAINER..."
 # -F c — custom format: восстанавливается pg_restore, можно смотреть содержимое.
-docker exec "$CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -F c > "$partial"
+# Сжимаем на хосте: pg_dump -F c отдаёт формат PGDMP (не gzip), а restore-db.sh
+# и проверки ниже ожидают .dump.gz. Без `| gzip` gzip -t всегда падал — так
+# ежедневные бэкапы не сохранялись вовсе. pipefail (см. set -euo) ловит ошибку
+# любой из сторон конвейера.
+if ! docker exec "$CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" -F c | gzip > "$partial"; then
+    log "ОШИБКА: pg_dump или gzip завершились с ошибкой, бэкап не сохранён" >&2
+    exit 1
+fi
 
 # Дамп пишем во временный файл и проверяем, что он читается целиком:
 # битый бэкап хуже отсутствующего, потому что на него надеются.
