@@ -764,9 +764,6 @@ tbody tr:has(.cell.selected) td:first-child {
   tbody td {
     padding: 6px 2px;
   }
-  .repertoire-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* ---------- Вкладки ---------- */
@@ -920,58 +917,7 @@ tbody tr:has(.cell.selected) td:first-child {
   }
 }
 
-/* ---------- Репертуар (карточки) ---------- */
-.repertoire-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-  padding: 4px 0;
-}
-
-.repertoire-card {
-  background: var(--bg-card);
-  border-radius: 16px;
-  box-shadow: 0 4px 12px var(--shadow-color);
-  overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border-color);
-}
-
-.repertoire-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px var(--shadow-color);
-}
-
-.repertoire-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: var(--bg-header);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.repertoire-date {
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-}
-
-.repertoire-archive-badge {
-  font-size: 0.75rem;
-  background: var(--bg-cell);
-  padding: 2px 10px;
-  border-radius: 12px;
-  color: var(--text-muted);
-}
-
-.repertoire-card-body {
-  padding: 12px 16px;
-  flex: 1;
-}
-
+/* ---------- Репертуар (элементы внутри карточки) ---------- */
 .repertoire-songs,
 .repertoire-colors {
   margin-bottom: 12px;
@@ -1061,12 +1007,6 @@ tbody tr:has(.cell.selected) td:first-child {
   padding: 4px 0;
 }
 
-.repertoire-card-footer {
-  padding: 10px 16px;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-card);
-}
-
 .add-song-to-date-btn {
   width: 100%;
   padding: 8px 0;
@@ -1088,19 +1028,6 @@ tbody tr:has(.cell.selected) td:first-child {
 
 /* Адаптивность */
 @media (max-width: 640px) {
-  .repertoire-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .repertoire-card {
-    border-radius: 12px;
-  }
-
-  .repertoire-date {
-    font-size: 1rem;
-  }
-
   .song-name {
     font-size: 0.9rem;
   }
@@ -1592,7 +1519,7 @@ tbody tr:has(.cell.selected) td:first-child {
 /* ---------- Карточки графика ---------- */
 .duty-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
   padding: 4px 0;
 }
@@ -1783,6 +1710,72 @@ tbody tr:has(.cell.selected) td:first-child {
 .song-name.has-text:hover {
   text-decoration: underline;
   color: var(--border-selected);
+}
+
+/* ---------- Репертуар внутри карточки даты ---------- */
+.card-repertoire {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.repertoire-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.repertoire-toggle:hover {
+  color: #4f46e5;
+}
+
+.repertoire-count {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--bg-cell);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.repertoire-toggle-icon {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.card-repertoire.open .repertoire-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.repertoire-panel {
+  display: none;
+  padding-top: 4px;
+}
+
+.card-repertoire.open .repertoire-panel {
+  display: block;
+}
+
+.card-repertoire .repertoire-colors {
+  margin-top: 8px;
+}
+
+.card-repertoire .add-song-to-date-btn {
+  margin-top: 8px;
 }
 
 /* Карточки архива (наследуют стили от обычных карточек) */

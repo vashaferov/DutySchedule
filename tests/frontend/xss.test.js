@@ -39,7 +39,7 @@ const NEEDED = [
   'formatDateDisplay',
   'getActionHTML',
   'buildCardsHTML',
-  'buildRepertoireTableHTML',
+  'buildRepertoireSectionHTML',
 ];
 
 // 0. Инлайновый скрипт целиком должен парситься. Проверка нужна потому, что
@@ -65,7 +65,7 @@ const factory = new Function(
   'MAX_PER_DAY',
   'currentUser',
   'isAdmin',
-  code + '\nreturn { buildCardsHTML: buildCardsHTML, buildRepertoireTableHTML: buildRepertoireTableHTML };'
+  code + '\nreturn { buildCardsHTML: buildCardsHTML, buildRepertoireSectionHTML: buildRepertoireSectionHTML };'
 );
 const render = factory(2, 'admin', true);
 
@@ -119,10 +119,10 @@ const cardsHtml = check(
   [PAYLOADS.date, PAYLOADS.name]
 );
 
-// --- Таблица репертуара -----------------------------------------------------
+// --- Репертуар внутри карточки даты -----------------------------------------
 check(
-  'buildRepertoireTableHTML: дата + песня + цвет',
-  render.buildRepertoireTableHTML(
+  'buildRepertoireSectionHTML: дата + песня + цвет',
+  render.buildRepertoireSectionHTML(
     [{ dateStr: PAYLOADS.date, songs: [{ name: PAYLOADS.song, text: 'текст' }], colors: [PAYLOADS.color] }],
     false
   ),

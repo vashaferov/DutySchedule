@@ -41,7 +41,6 @@
     <!-- Вкладки -->
     <div class="tabs">
       <button class="tab-btn active" data-tab="schedule">📋 График</button>
-      <button class="tab-btn" data-tab="repertoire">🎵 Репертуар</button>
     </div>
 
     <!-- Контейнер для загрузки -->
@@ -57,6 +56,9 @@
         <div class="section-title">
           🟢 Актуальные даты
           <span class="count" id="main-count"></span>
+          <button id="manage-songs-btn"
+            style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">🎵
+            Управление песнями</button>
           <button id="add-date-btn"
             style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">➕
             Добавить дату</button>
@@ -82,21 +84,6 @@
           <span class="count" id="archive-count"></span>
         </div>
         <div id="archive-table-container" class="archive-table"></div>
-      </div>
-    </div>
-
-    <!-- Вкладка: Репертуар -->
-    <div id="tab-repertoire" class="tab-content" style="display:none;">
-      <div class="section">
-        <div class="section-title">
-          🎵 Актуальный репертуар
-          <span class="count" id="repertoire-future-count"></span>
-          <button id="manage-songs-btn"
-            style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">🎵
-            Управление песнями</button>
-        </div>
-        <div id="repertoire-future-container"></div>
-        <div id="repertoire-pagination" class="pagination"></div>
       </div>
     </div>
 
@@ -360,9 +347,7 @@
       let pastDates = [];
       let currentPage = 0;
       let repertoireData = {};
-      let repertoireFuture = [];
-      let repertoirePast = [];
-      let repertoireCurrentPage = 0;
+      let expandedRepertoireDates = new Set();
       let currentUser = '';
       let authToken = '';   // вместо PIN: сам PIN в браузере больше не хранится
       let isAdmin = false;
@@ -598,7 +583,6 @@
         localStorage.setItem('currentUserToken', token);
         localStorage.setItem('currentUserRole', admin ? 'admin' : 'user');
         updateAuthUI();
-        renderRepertoire();
         renderMainCards();
         renderArchiveTable();
       }
@@ -633,7 +617,6 @@
           localStorage.setItem('currentUser', me.name);
           localStorage.setItem('currentUserRole', me.role);
           updateAuthUI();
-          renderRepertoire();
           renderMainCards();
           renderArchiveTable();
         } catch (e) {
@@ -1471,7 +1454,8 @@
           }
         });
         repertoireData = data;
-        renderRepertoire();
+        renderMainCards();
+        renderArchiveTable();
       }
 
       // ---------- Загрузка данных ----------
@@ -1546,7 +1530,6 @@
           renderMainCards();
           renderArchiveTable();
           renderStats();
-          renderRepertoire();
           updateCounts();
 
         } catch (e) {
@@ -1557,7 +1540,15 @@
         }
       }
 
-      // ---------- Рендер основной таблицы (без изменений) ----------
+      // ---------- Рендер основной таблицы ----------
+      function withRepertoire(item) {
+        const entry = repertoireData[item.dateStr] || {};
+        return Object.assign({}, item, {
+          songs: entry.songs || [],
+          colors: entry.colors || []
+        });
+      }
+
       function renderMainCards() {
         const container = document.getElementById('main-table-container');
         const paginationEl = document.getElementById('main-pagination');
@@ -1574,7 +1565,7 @@
 
         const start = currentPage * PAGE_SIZE;
         const end = Math.min(start + PAGE_SIZE, futureDates.length);
-        const pageItems = futureDates.slice(start, end);
+        const pageItems = futureDates.slice(start, end).map(withRepertoire);
 
         container.innerHTML = buildCardsHTML(pageItems, false);
         attachCardEvents();
@@ -1632,6 +1623,7 @@
           }).join('')}
           </div>
           ${!isArchive ? getActionHTML(dateStr, row, names) : ''}
+          ${buildRepertoireSectionHTML([{ dateStr, songs: item.songs || [], colors: item.colors || [] }], isArchive)}
         </div>
       </div>
     `;
@@ -1687,6 +1679,60 @@
         document.querySelectorAll('.btn-delete-date').forEach(btn => {
           btn.removeEventListener('click', handleDeleteDate);
           btn.addEventListener('click', handleDeleteDate);
+        });
+
+        // Сворачивание/раскрытие песен в карточке
+        document.querySelectorAll('.repertoire-toggle').forEach(btn => {
+          btn.removeEventListener('click', handleRepertoireToggle);
+          btn.addEventListener('click', handleRepertoireToggle);
+        });
+
+        // Просмотр текста песни
+        document.querySelectorAll('.card-repertoire .song-name.has-text').forEach(el => {
+          el.removeEventListener('click', openViewSongModalHandler);
+          el.addEventListener('click', openViewSongModalHandler);
+        });
+
+        // Управление песнями на дате (только админ)
+        document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
+          btn.removeEventListener('click', deleteRepertoireSongHandler);
+          btn.addEventListener('click', deleteRepertoireSongHandler);
+        });
+        document.querySelectorAll('.move-song-up-btn').forEach(btn => {
+          btn.removeEventListener('click', moveSongUpHandler);
+          btn.addEventListener('click', moveSongUpHandler);
+        });
+        document.querySelectorAll('.move-song-down-btn').forEach(btn => {
+          btn.removeEventListener('click', moveSongDownHandler);
+          btn.addEventListener('click', moveSongDownHandler);
+        });
+        document.querySelectorAll('.add-song-to-date-btn').forEach(btn => {
+          btn.removeEventListener('click', addSongToDateHandler);
+          btn.addEventListener('click', addSongToDateHandler);
+        });
+
+        applyRepertoireExpansionState();
+      }
+
+      function handleRepertoireToggle(e) {
+        e.preventDefault();
+        const btn = e.currentTarget;
+        const block = btn.closest('.card-repertoire');
+        if (!block) return;
+        const dateStr = btn.dataset.date;
+        const isOpen = block.classList.toggle('open');
+        btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (isOpen) expandedRepertoireDates.add(dateStr);
+        else expandedRepertoireDates.delete(dateStr);
+      }
+
+      function applyRepertoireExpansionState() {
+        document.querySelectorAll('.card-repertoire').forEach(block => {
+          const dateStr = block.dataset.date;
+          const isOpen = expandedRepertoireDates.has(dateStr);
+          block.classList.toggle('open', isOpen);
+          const btn = block.querySelector('.repertoire-toggle');
+          if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         });
       }
 
@@ -1921,8 +1967,8 @@
           return;
         }
         // Админу архив доступен на редактирование (только дежурные), остальным — только чтение.
-        container.innerHTML = buildCardsHTML(pastDates, !isAdmin);
-        if (isAdmin) attachCardEvents();
+        container.innerHTML = buildCardsHTML(pastDates.map(withRepertoire), !isAdmin);
+        attachCardEvents();
       }
 
       // ---------- Построение HTML таблицы (без изменений) ----------
@@ -2194,120 +2240,15 @@
         return div.firstElementChild;
       }
 
-      // ---------- Репертуар (без изменений) ----------
-      function renderRepertoire() {
-        const futureContainer = document.getElementById('repertoire-future-container');
-        const paginationEl = document.getElementById('repertoire-pagination');
-        const futureCount = document.getElementById('repertoire-future-count');
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const future = [];
-
-        Object.keys(repertoireData).forEach(dateStr => {
-          const entry = repertoireData[dateStr];
-          const d = parseDateDDMMYYYY(dateStr);
-          if (!d) {
-            future.push({ dateStr, songs: entry.songs || [], colors: entry.colors || [] });
-            return;
-          }
-          d.setHours(0, 0, 0, 0);
-          if (d >= today) {
-            future.push({ dateStr, songs: entry.songs || [], colors: entry.colors || [] });
-          }
-        });
-
-        future.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
-
-        repertoireFuture = future;
-        repertoireCurrentPage = 0;
-
-        futureCount.textContent = `(${future.length})`;
-
-        renderRepertoireFuture();
-      }
-
-      function renderRepertoireFuture() {
-        const container = document.getElementById('repertoire-future-container');
-        const paginationEl = document.getElementById('repertoire-pagination');
-
-        if (repertoireFuture.length === 0) {
-          container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Нет предстоящих дат в репертуаре.</p>';
-          paginationEl.innerHTML = '';
-          return;
-        }
-
-        const totalPages = Math.ceil(repertoireFuture.length / REPERTOIRE_PAGE_SIZE);
-        if (repertoireCurrentPage >= totalPages) repertoireCurrentPage = totalPages - 1;
-        if (repertoireCurrentPage < 0) repertoireCurrentPage = 0;
-
-        const start = repertoireCurrentPage * REPERTOIRE_PAGE_SIZE;
-        const end = Math.min(start + REPERTOIRE_PAGE_SIZE, repertoireFuture.length);
-        const pageItems = repertoireFuture.slice(start, end);
-
-        container.innerHTML = buildRepertoireTableHTML(pageItems);
-        paginationEl.innerHTML = `
-          <button class="prev" ${repertoireCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
-          <span>${repertoireCurrentPage + 1} / ${totalPages}</span>
-          <button class="next" ${repertoireCurrentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
-        `;
-        paginationEl.querySelector('.prev').addEventListener('click', () => {
-          if (repertoireCurrentPage > 0) { repertoireCurrentPage--; renderRepertoireFuture(); }
-        });
-        paginationEl.querySelector('.next').addEventListener('click', () => {
-          if (repertoireCurrentPage < totalPages - 1) { repertoireCurrentPage++; renderRepertoireFuture(); }
-        });
-
-        attachCopyEvents();
-        attachRepertoireEvents();
-
-        container.querySelectorAll('.add-song-to-date-btn').forEach(btn => {
-          btn.removeEventListener('click', addSongToDateHandler);
-          btn.addEventListener('click', addSongToDateHandler);
-        });
-      }
-
+      // ---------- Репертуар внутри карточек графика ----------
       function addSongToDateHandler(e) {
         const date = this.dataset.date;
         openAddRepertoireSongModal(date);
       }
 
-      function attachRepertoireEvents() {
-        document.querySelectorAll('.song-name.has-text').forEach(el => {
-          el.removeEventListener('click', openViewSongModalHandler);
-          el.addEventListener('click', openViewSongModalHandler);
-        });
-        if (isAdmin) {
-          document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
-            btn.removeEventListener('click', deleteRepertoireSongHandler);
-            btn.addEventListener('click', deleteRepertoireSongHandler);
-          });
-          document.querySelectorAll('.move-song-up-btn').forEach(btn => {
-            btn.removeEventListener('click', moveSongUpHandler);
-            btn.addEventListener('click', moveSongUpHandler);
-          });
-          document.querySelectorAll('.move-song-down-btn').forEach(btn => {
-            btn.removeEventListener('click', moveSongDownHandler);
-            btn.addEventListener('click', moveSongDownHandler);
-          });
-        }
-      }
-
       function openViewSongModalHandler(e) {
         const songName = this.dataset.song;
         openViewSongModal(songName);
-      }
-
-      async function copySongTextHandler(e) {
-        const text = this.dataset.text;
-        try {
-          await navigator.clipboard.writeText(text);
-          const original = this.textContent;
-          this.textContent = '✅ Скопировано!';
-          setTimeout(() => { this.textContent = original; }, 2000);
-        } catch (err) {
-          showNotification('Не удалось скопировать текст', 'warning');
-        }
       }
 
       // ---- Новые обработчики для репертуара (используют новые эндпоинты) ----
@@ -2376,10 +2317,11 @@
         }
       }
 
-      // ---------- Построение HTML репертуара (без изменений) ----------
-      function buildRepertoireTableHTML(items, isArchive = false) {
+      // ---------- Построение HTML репертуара внутри карточки даты ----------
+      function buildRepertoireSectionHTML(items, isArchive = false) {
         if (!items || items.length === 0) return '';
-        let html = '<div class="repertoire-grid">';
+        const canEdit = !isArchive && isAdmin;
+        let html = '';
 
         items.forEach(item => {
           const dateStr = item.dateStr;
@@ -2387,19 +2329,18 @@
           const colors = item.colors || [];
 
           html += `
-            <div class="repertoire-card">
-              <div class="repertoire-card-header">
-                <span class="repertoire-date">${escapeHtml(dateStr)}</span>
-                ${isArchive ? '<span class="repertoire-archive-badge">📦 Архив</span>' : ''}
-              </div>
-              <div class="repertoire-card-body">
+            <div class="card-repertoire" data-date="${escapeHtml(dateStr)}">
+              <button type="button" class="repertoire-toggle" data-date="${escapeHtml(dateStr)}" aria-expanded="false">
+                <span class="repertoire-toggle-label">🎵 Песни${songs.length ? ` <span class="repertoire-count">${songs.length}</span>` : ''}</span>
+                <span class="repertoire-toggle-icon" aria-hidden="true">▾</span>
+              </button>
+              <div class="repertoire-panel">
                 <div class="repertoire-songs">
-                  <div class="repertoire-section-title">🎵 Песни</div>
                   ${songs.length ? songs.map(song => `
                     <div class="repertoire-song-item">
-                      <span class="song-name ${song.text ? 'has-text' : ''}" data-song="${escapeHtml(song.name)}" ${song.text ? 'style="cursor:pointer;"' : ''}>• ${escapeHtml(song.name)}</span>
+                      <span class="song-name ${song.text ? 'has-text' : ''}" data-song="${escapeHtml(song.name)}">• ${escapeHtml(song.name)}</span>
                       <div class="song-actions">
-                        ${!isArchive && isAdmin ? `
+                        ${canEdit ? `
                           <button class="move-song-up-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Переместить вверх">↑</button>
                           <button class="move-song-down-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Переместить вниз">↓</button>
                           <button class="delete-repertoire-song-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Удалить песню">✖</button>
@@ -2408,58 +2349,24 @@
                     </div>
                   `).join('') : '<div class="repertoire-empty">—</div>'}
                 </div>
-                <div class="repertoire-colors">
-                  <div class="repertoire-section-title">🎨 Цвета</div>
-                  ${colors.length ? colors.map(c => `
-                    <span class="repertoire-color-item">
-                      <span class="color-dot" style="background:${escapeHtml(c.toLowerCase())}"></span>
-                      ${escapeHtml(c)}
-                    </span>
-                  `).join('') : '<div class="repertoire-empty">—</div>'}
-                </div>
+                ${colors.length ? `
+                  <div class="repertoire-colors">
+                    <div class="repertoire-section-title">🎨 Цвета</div>
+                    ${colors.map(c => `
+                      <span class="repertoire-color-item">
+                        <span class="color-dot" style="background:${escapeHtml(c.toLowerCase())}"></span>
+                        ${escapeHtml(c)}
+                      </span>
+                    `).join('')}
+                  </div>
+                ` : ''}
+                ${canEdit ? `<button class="add-song-to-date-btn" data-date="${escapeHtml(dateStr)}">+ Добавить песню</button>` : ''}
               </div>
-              ${!isArchive && isAdmin ? `
-                <div class="repertoire-card-footer">
-                  <button class="add-song-to-date-btn" data-date="${escapeHtml(dateStr)}">+ Добавить песню</button>
-                </div>
-              ` : ''}
             </div>
           `;
         });
 
-        html += '</div>';
         return html;
-      }
-
-      function attachCopyEvents() {
-        document.querySelectorAll('.copyable-song').forEach(el => {
-          el.removeEventListener('click', copySongHandler);
-          el.addEventListener('click', copySongHandler);
-        });
-      }
-
-      function copySongHandler(e) {
-        const text = this.textContent.replace(/^•\s*/, '').trim();
-        navigator.clipboard.writeText(text).then(() => {
-          const original = this.textContent;
-          this.textContent = '✅ ' + original;
-          setTimeout(() => {
-            this.textContent = original;
-          }, 1500);
-        }).catch(() => {
-          showNotification('Не удалось скопировать текст', 'warning');
-        });
-      }
-
-      function getColorEmoji(colorName) {
-        const colorMap = {
-          'красный': '🔴', 'синий': '🔵', 'зеленый': '🟢', 'зелёный': '🟢',
-          'желтый': '🟡', 'жёлтый': '🟡', 'оранжевый': '🟠', 'фиолетовый': '🟣',
-          'розовый': '🌸', 'черный': '⚫', 'чёрный': '⚫', 'белый': '⚪',
-          'серый': '🔘', 'коричневый': '🟤'
-        };
-        const lower = colorName.toLowerCase().trim();
-        return colorMap[lower] || '🎨';
       }
 
       let assignDate = '';
