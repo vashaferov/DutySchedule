@@ -119,10 +119,22 @@ jobs:
 
             # Клонируем или обновляем код. Вместо if/else — два независимых if:
             # ветка else в этом скрипте обрывает деплой (см. пояснение ниже).
+            #
+            # Сервер — не рабочая копия. Если на нём остались правки (ручной
+            # хотфикс, experiment), `git pull` откажется перезаписывать файлы,
+            # и деплой встанет на ровном месте — так и случилось 22.10.2026
+            # с scripts/backup-db.sh. Поэтому правки сохраняются в патч, а
+            # дерево принудительно приводится к origin/main. .env и logs/ не
+            # трогаются: они в .gitignore и остаются на диске.
             set +e
             if [ -d .git ]; then
-                echo "Pulling latest changes..."
-                git pull
+                echo "Fetching origin..."
+                git fetch origin
+                echo "Local changes (if any) are saved to ~/duty-local-changes.patch"
+                git status --short
+                git diff origin/main > ~/duty-local-changes.patch
+                chmod 600 ~/duty-local-changes.patch
+                git reset --hard origin/main
             fi
             if [ ! -d .git ]; then
                 echo "Cloning repository..."

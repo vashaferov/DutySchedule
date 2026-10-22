@@ -118,8 +118,11 @@ make_stubs() {
     mkdir -p "$dir"
 
     # git: успешно всё; при clone — «выкладываем» файлы репозитория.
+    # Вызовы пишем в лог: по нему проверяем, что деплой не делает git pull,
+    # а обновляет origin и сбрасывает возможные правки на сервере.
     cat > "$dir/git" <<'STUB'
 #!/usr/bin/env bash
+echo "git $*" >> "${STUB_GIT_LOG:-/dev/null}"
 if [ "${1:-}" = "clone" ]; then
     if [ -n "${STUB_REPO_FIXTURE:-}" ]; then
         cp -r "$STUB_REPO_FIXTURE/." . 2>/dev/null
@@ -188,6 +191,7 @@ run_scenario() {
     FAKE_CRONTAB_TABLE="$work/$name/tables/crontab" \
     STUB_USERS_COUNT="$users" \
     STUB_REPO_FIXTURE="$fixture" \
+    STUB_GIT_LOG="$work/$name/git.log" \
     PATH="$bin:$PATH" \
     "$BASH_BIN" "$work/deploy.sim.sh" > "$log" 2>&1 || rc=$?
     echo "$rc"
@@ -201,6 +205,14 @@ contains "$work/live-users.log" "База инициализирована, по
 contains "$work/live-users.log" "Using Docker Compose" "команда compose определена"
 contains "$work/live-users.log" "docker image prune -f" "старые образы чистятся после деплоя"
 contains "$work/live-users/tables/crontab" "rotate-nginx-logs.sh" "ротация логов поставлена в cron"
+contains "$work/live-users/git.log" "fetch origin" "перед деплоем обновляется origin"
+contains "$work/live-users/git.log" "reset --hard origin/main" "локальные правки на сервере сбрасываются"
+if [ -f "$work/live-users/home/duty-local-changes.patch" ]; then
+    echo "  ok: правки сохраняются в ~/duty-local-changes.patch"
+else
+    echo "  FAIL: патч с локальными правками не создан"
+    failures=$((failures + 1))
+fi
 
 echo "3. Пустая база (предупреждение вместо молчаливого пропуска)"
 rc="$(run_scenario empty-db 0 yes)"
