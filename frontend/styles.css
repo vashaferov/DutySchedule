@@ -1147,6 +1147,55 @@ tbody tr:has(.cell.selected) td:first-child {
   min-height: 80px;
 }
 
+/* ---------- Автодополнение названия песни ---------- */
+.song-suggest-wrap {
+  margin-top: 4px;
+}
+
+.song-suggest-wrap .modal-input {
+  margin-top: 0;
+}
+
+.song-suggestions {
+  display: none;
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.song-suggestions.visible {
+  display: block;
+}
+
+.song-suggestion {
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.song-suggestion:last-child {
+  border-bottom: none;
+}
+
+.song-suggestion:hover,
+.song-suggestion.active {
+  background: var(--bg-cell-hover);
+}
+
+.song-suggestion-empty {
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
 .modal-error {
   color: #ef4444;
   font-size: 0.9rem;
@@ -1420,103 +1469,20 @@ tbody tr:has(.cell.selected) td:first-child {
     font-size: 0.85rem;
     padding: 12px 14px;
   }
+  .song-suggestions {
+    max-height: 180px;
+  }
+  .song-suggestion {
+    padding: 12px;
+    font-size: 1rem;
+  }
 }
 
 /* ---------- Карточки графика ---------- */
-.duty-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  padding: 4px 0;
-}
-
-.duty-card {
-  background: var(--bg-card);
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 4px 12px var(--shadow-color);
-  border: 1px solid var(--border-color);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.duty-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px var(--shadow-color);
-}
-
-.duty-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.duty-date {
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-secondary);
-}
-
-.duty-count {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  background: var(--bg-cell);
-  padding: 2px 10px;
-  border-radius: 12px;
-}
-
-.duty-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.duty-progress {
-  width: 100%;
-}
-
-.duty-users {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.duty-user {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  background: var(--bg-cell);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-  border: 1px solid transparent;
-}
-
-.duty-user.selected {
-  background: var(--bg-cell-selected);
-  color: var(--text-selected);
-  border-color: var(--border-selected);
-}
-
-.duty-user:not(.disabled):hover {
-  background: var(--bg-cell-hover);
-}
-
-.duty-user.disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-  pointer-events: none;
-}
-
 .duty-user .selected-icon {
   font-size: 0.7rem;
 }
 
-/* ---------- Карточки графика ---------- */
 .duty-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1533,6 +1499,14 @@ tbody tr:has(.cell.selected) td:first-child {
   transition: transform 0.2s, box-shadow 0.2s;
   display: flex;
   flex-direction: column;
+  /* Одинаковый размер карточек в свёрнутом виде */
+  height: 250px;
+}
+
+/* Развёрнутые песни или выбор дежурных могут увеличить карточку */
+.duty-card.expanded {
+  height: auto;
+  min-height: 250px;
 }
 
 .duty-card:hover {
@@ -1544,13 +1518,20 @@ tbody tr:has(.cell.selected) td:first-child {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .duty-date {
   font-weight: 700;
   font-size: 1rem;
   color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .duty-count {
@@ -1565,6 +1546,7 @@ tbody tr:has(.cell.selected) td:first-child {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .btn-delete-date {
@@ -1590,16 +1572,29 @@ tbody tr:has(.cell.selected) td:first-child {
   flex-direction: column;
   gap: 8px;
   flex: 1;
+  min-height: 0;
 }
 
 .duty-progress {
   width: 100%;
+  flex-shrink: 0;
 }
 
 .duty-users {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-content: flex-start;
+  /* Фиксированная зона под дежурных: до двух строк */
+  height: 60px;
+  overflow-y: auto;
+}
+
+.duty-action {
+  display: flex;
+  align-items: flex-start;
+  min-height: 34px;
+  flex-shrink: 0;
 }
 
 .duty-user {
@@ -1714,9 +1709,10 @@ tbody tr:has(.cell.selected) td:first-child {
 
 /* ---------- Репертуар внутри карточки даты ---------- */
 .card-repertoire {
-  margin-top: 4px;
+  margin-top: auto;
   padding-top: 8px;
   border-top: 1px dashed var(--border-color);
+  flex-shrink: 0;
 }
 
 .repertoire-toggle {

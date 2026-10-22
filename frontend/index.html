@@ -249,9 +249,12 @@
         </div>
         <div class="modal-body">
           <p style="color:var(--text-muted); font-size:0.9rem;">Введите название песни</p>
-          <input type="text" id="repertoire-song-input" placeholder="Начните вводить название..." class="modal-input"
-            list="repertoire-song-datalist" autocomplete="off">
-          <datalist id="repertoire-song-datalist"></datalist>
+          <div class="song-suggest-wrap">
+            <input type="text" id="repertoire-song-input" placeholder="Начните вводить название..." class="modal-input"
+              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <div id="repertoire-song-suggestions" class="song-suggestions" role="listbox"
+              aria-label="Подходящие песни"></div>
+          </div>
           <div id="add-repertoire-song-error" class="modal-error"></div>
         </div>
         <div class="modal-footer">
@@ -1324,74 +1327,138 @@
       });
 
       // ---------- Модалка добавления песни в репертуар ----------
+      let repertoireSuggestionIndex = -1;
+
+      function getRepertoireSuggestionsEl() {
+        return document.getElementById('repertoire-song-suggestions');
+      }
+
+      function hideRepertoireSuggestions() {
+        const container = getRepertoireSuggestionsEl();
+        if (!container) return;
+        container.classList.remove('visible');
+        container.innerHTML = '';
+        repertoireSuggestionIndex = -1;
+      }
+
+      function renderRepertoireSuggestions() {
+        const input = document.getElementById('repertoire-song-input');
+        const container = getRepertoireSuggestionsEl();
+        if (!input || !container) return;
+
+        const query = input.value.trim().toLowerCase();
+        const matches = allSongs
+          .filter(song => !query || song.name.toLowerCase().includes(query))
+          .slice(0, 30);
+
+        repertoireSuggestionIndex = -1;
+        container.innerHTML = '';
+
+        if (!allSongs.length) {
+          hideRepertoireSuggestions();
+          return;
+        }
+
+        if (matches.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'song-suggestion-empty';
+          empty.textContent = 'Ничего не найдено';
+          container.appendChild(empty);
+        } else {
+          matches.forEach(song => {
+            const item = document.createElement('div');
+            item.className = 'song-suggestion';
+            item.setAttribute('role', 'option');
+            item.textContent = song.name;
+            item.addEventListener('click', () => selectRepertoireSuggestion(song.name));
+            container.appendChild(item);
+          });
+        }
+        container.classList.add('visible');
+      }
+
+      function selectRepertoireSuggestion(songName) {
+        const input = document.getElementById('repertoire-song-input');
+        if (!input) return;
+        input.value = songName;
+        hideRepertoireSuggestions();
+        // На мобильных убираем клавиатуру после выбора
+        input.blur();
+      }
+
+      function highlightRepertoireSuggestion(delta) {
+        const container = getRepertoireSuggestionsEl();
+        const items = container ? container.querySelectorAll('.song-suggestion') : [];
+        if (!items.length) return;
+        repertoireSuggestionIndex += delta;
+        if (repertoireSuggestionIndex < 0) repertoireSuggestionIndex = items.length - 1;
+        if (repertoireSuggestionIndex >= items.length) repertoireSuggestionIndex = 0;
+        items.forEach((item, index) => {
+          item.classList.toggle('active', index === repertoireSuggestionIndex);
+        });
+        const active = items[repertoireSuggestionIndex];
+        if (active && active.scrollIntoView) {
+          active.scrollIntoView({ block: 'nearest' });
+        }
+      }
+
       function openAddRepertoireSongModal(date) {
         currentRepertoireDate = date;
         const modal = document.getElementById('add-repertoire-song-modal');
         const input = document.getElementById('repertoire-song-input');
-        const datalist = document.getElementById('repertoire-song-datalist');
         const error = document.getElementById('add-repertoire-song-error');
         error.style.display = 'none';
         input.value = '';
-        input.focus();
+        hideRepertoireSuggestions();
 
         // Загружаем список песен, если пусто
         if (!allSongs.length) {
           loadSongs().then(songs => {
             allSongs = songs;
-            fillRepertoireDatalist(datalist);
+            renderRepertoireSuggestions();
           }).catch(e => showNotification('Ошибка загрузки песен: ' + e.message, 'error'));
-        } else {
-          fillRepertoireDatalist(datalist);
         }
 
         modal.style.display = 'flex';
+        input.focus();
+        if (allSongs.length) renderRepertoireSuggestions();
       }
 
-      function fillRepertoireDatalist(datalist) {
-        datalist.innerHTML = '';
-        allSongs.forEach(song => {
-          const option = document.createElement('option');
-          option.value = song.name;
-          datalist.appendChild(option);
-        });
-      }
+      // Автодополнение работает и на мобильных: свой список вместо <datalist>,
+      // который на телефонах не раскрывает подсказки.
+      const repertoireSongInput = document.getElementById('repertoire-song-input');
+      const repertoireSuggestionsEl = document.getElementById('repertoire-song-suggestions');
 
-      function applyRepertoireFilter() {
-        const filter = document.getElementById('repertoire-song-filter').value.toLowerCase().trim();
-        const select = document.getElementById('repertoire-song-select');
-        const options = select.querySelectorAll('option');
-        let hasVisible = false;
-        options.forEach(opt => {
-          if (opt.value === '') return; // пропускаем пустой option
-          const text = opt.textContent.toLowerCase();
-          const match = text.includes(filter);
-          opt.style.display = match ? '' : 'none';
-          if (match) hasVisible = true;
-        });
-        // Показываем сообщение, если ничего не найдено
-        const existingMsg = select.parentElement.querySelector('.no-results-msg');
-        if (!hasVisible && filter !== '') {
-          if (!existingMsg) {
-            const msg = document.createElement('div');
-            msg.className = 'no-results-msg';
-            msg.textContent = '❌ Ничего не найдено';
-            msg.style.cssText = 'color:var(--text-muted); font-size:0.9rem; padding:4px 0;';
-            select.parentElement.appendChild(msg);
+      repertoireSongInput.addEventListener('input', renderRepertoireSuggestions);
+      repertoireSongInput.addEventListener('focus', function () {
+        if (allSongs.length) renderRepertoireSuggestions();
+      });
+      repertoireSongInput.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          highlightRepertoireSuggestion(1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          highlightRepertoireSuggestion(-1);
+        } else if (e.key === 'Escape') {
+          hideRepertoireSuggestions();
+        } else if (e.key === 'Enter') {
+          const items = repertoireSuggestionsEl.querySelectorAll('.song-suggestion');
+          if (repertoireSuggestionIndex >= 0 && items[repertoireSuggestionIndex]) {
+            e.preventDefault();
+            selectRepertoireSuggestion(items[repertoireSuggestionIndex].textContent);
           }
-        } else {
-          if (existingMsg) existingMsg.remove();
         }
-      }
+      });
 
-      function fillRepertoireSongSelect(select) {
-        select.innerHTML = '<option value="">— Выберите —</option>';
-        allSongs.forEach(song => {
-          const opt = document.createElement('option');
-          opt.value = song.name;
-          opt.textContent = song.name;
-          select.appendChild(opt);
-        });
-      }
+      // Тап/клик вне поля и списка закрывает подсказки
+      document.addEventListener('pointerdown', function (e) {
+        const modal = document.getElementById('add-repertoire-song-modal');
+        if (!modal || modal.style.display === 'none') return;
+        if (e.target instanceof Element && !e.target.closest('.song-suggest-wrap')) {
+          hideRepertoireSuggestions();
+        }
+      });
 
       document.getElementById('add-repertoire-song-confirm').addEventListener('click', async () => {
         const input = document.getElementById('repertoire-song-input');
@@ -1601,7 +1668,7 @@
           html += `
       <div class="duty-card" data-date="${escapeHtml(dateStr)}">
         <div class="duty-card-header">
-          <span class="duty-date">${escapeHtml(formatDateDisplay(dateStr))}</span>
+          <span class="duty-date" title="${escapeHtml(formatDateDisplay(dateStr))}">${escapeHtml(formatDateDisplay(dateStr))}</span>
           <span class="duty-card-header-right">
             <span class="duty-count">${checkedCount}/${MAX_PER_DAY}</span>
             ${isAdmin ? '<button class="btn-delete-date" title="Удалить дату" aria-label="Удалить дату">🗑️</button>' : ''}
@@ -1622,7 +1689,7 @@
             return `<span class="${cls}" data-date="${escapeHtml(dateStr)}" data-name="${escapeHtml(name)}" data-checked="true">${escapeHtml(name)} ✔</span>`;
           }).join('')}
           </div>
-          ${!isArchive ? getActionHTML(dateStr, row, names) : ''}
+          <div class="duty-action">${!isArchive ? getActionHTML(dateStr, row, names) : ''}</div>
           ${buildRepertoireSectionHTML([{ dateStr, songs: item.songs || [], colors: item.colors || [] }], isArchive)}
         </div>
       </div>
@@ -1724,6 +1791,14 @@
         btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         if (isOpen) expandedRepertoireDates.add(dateStr);
         else expandedRepertoireDates.delete(dateStr);
+        syncDutyCardExpanded(block.closest('.duty-card'));
+      }
+
+      function syncDutyCardExpanded(card) {
+        if (!card) return;
+        const hasOpenRepertoire = !!card.querySelector('.card-repertoire.open');
+        const hasEditor = !!card.querySelector('.duty-editor');
+        card.classList.toggle('expanded', hasOpenRepertoire || hasEditor);
       }
 
       function applyRepertoireExpansionState() {
@@ -1733,6 +1808,7 @@
           block.classList.toggle('open', isOpen);
           const btn = block.querySelector('.repertoire-toggle');
           if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          syncDutyCardExpanded(block.closest('.duty-card'));
         });
       }
 
@@ -1787,6 +1863,7 @@
         if (existingEditor) {
           existingEditor.remove();
           btn.textContent = '👥 Выбрать дежурного';
+          syncDutyCardExpanded(card);
           return;
         }
 
@@ -1876,6 +1953,7 @@
         cancelBtn.addEventListener('click', function () {
           editor.remove();
           btn.textContent = '👥 Выбрать дежурного';
+          syncDutyCardExpanded(card);
         });
 
         actions.appendChild(saveBtn);
@@ -1884,6 +1962,7 @@
 
         card.querySelector('.duty-card-body').appendChild(editor);
         btn.textContent = '❌ Закрыть выбор';
+        syncDutyCardExpanded(card);
       }
 
       async function handleTakeDuty(e) {
