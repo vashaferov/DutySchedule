@@ -1116,35 +1116,33 @@ function renderSongs() {
   const box = $('#song-list');
   if (!box) return;
 
-  const withText = state.songs.filter((s) => s.text.trim()).length;
-  const used = state.songs.filter((s) => datesForSong(s.id).length > 0).length;
-  const metrics = $('#songs-metrics');
-  if (metrics) {
-    metrics.innerHTML = `
-      <article class="metric">
-        <div class="metric__top"><span>Всего песен</span><span class="metric__icon">${icon('songs')}</span></div>
-        <div class="metric__value">${state.songs.length}</div>
-        <p class="metric__note">В библиотеке</p>
-      </article>
-      <article class="metric">
-        <div class="metric__top"><span>С текстом</span><span class="metric__icon">${icon('edit')}</span></div>
-        <div class="metric__value">${withText}</div>
-        <p class="metric__note">${state.songs.length - withText} ${plural(state.songs.length - withText, ['без текста', 'без текста', 'без текста'])}</p>
-      </article>
-      <article class="metric">
-        <div class="metric__top"><span>В репертуаре</span><span class="metric__icon">${icon('calendar')}</span></div>
-        <div class="metric__value">${used}</div>
-        <p class="metric__note">Используются на датах</p>
-      </article>
-      <article class="metric">
-        <div class="metric__top"><span>Средняя длина</span><span class="metric__icon">${icon('stats')}</span></div>
-        <div class="metric__value">${Math.round(state.songs.reduce((sum, s) => sum + (s.text ? s.text.split('\n').length : 0), 0) / Math.max(1, withText))}<small>строк</small></div>
-        <p class="metric__note">В тексте песни</p>
-      </article>`;
-  }
+  // const withText = state.songs.filter((s) => s.text.trim()).length;
+  // const used = state.songs.filter((s) => datesForSong(s.id).length > 0).length;
+  // const metrics = $('#songs-metrics');
+  // if (metrics) {
+  //   metrics.innerHTML = `
+  //     <article class="metric">
+  //       <div class="metric__top"><span>Всего песен</span><span class="metric__icon">${icon('songs')}</span></div>
+  //       <div class="metric__value">${state.songs.length}</div>
+  //       <p class="metric__note">В библиотеке</p>
+  //     </article>
+  //     <article class="metric">
+  //       <div class="metric__top"><span>С текстом</span><span class="metric__icon">${icon('edit')}</span></div>
+  //       <div class="metric__value">${withText}</div>
+  //       <p class="metric__note">${state.songs.length - withText} ${plural(state.songs.length - withText, ['без текста', 'без текста', 'без текста'])}</p>
+  //     </article>
+  //     <article class="metric">
+  //       <div class="metric__top"><span>В репертуаре</span><span class="metric__icon">${icon('calendar')}</span></div>
+  //       <div class="metric__value">${used}</div>
+  //       <p class="metric__note">Используются на датах</p>
+  //     </article>
+  //     <article class="metric">
+  //       <div class="metric__top"><span>Средняя длина</span><span class="metric__icon">${icon('stats')}</span></div>
+  //       <div class="metric__value">${Math.round(state.songs.reduce((sum, s) => sum + (s.text ? s.text.split('\n').length : 0), 0) / Math.max(1, withText))}<small>строк</small></div>
+  //       <p class="metric__note">В тексте песни</p>
+  //     </article>`;
+  // }
 
-  const lead = $('#songs-lead');
-  if (lead) lead.textContent = `${state.songs.length} ${plural(state.songs.length, ['песня', 'песни', 'песен'])} · ${used} в репертуаре`;
 
   const search = $('#songs-search');
   if (search && search.value !== state.songsQuery) search.value = state.songsQuery;
