@@ -1,2659 +1,778 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="light">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MediaHLG</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="description" content="MediaHLG — график дежурств и репертуар" />
+  <title>MediaHLG — график дежурств и репертуар</title>
+  <link rel="stylesheet" href="styles.css?v=2.0" />
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('theme');
+        var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+      } catch (e) { /* storage disabled */ }
+    })();
+  </script>
 </head>
 
 <body>
-  <!-- Система уведомлений (toast) -->
-  <div id="toast-container"></div>
-  <!-- Глобальный индикатор загрузки -->
-  <div id="global-loader"
-    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
-    <div
-      style="background:var(--bg-card); padding:24px; border-radius:20px; display:flex; flex-direction:column; align-items:center; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-      <div class="spinner" style="width:40px; height:40px;"></div>
-      <p style="margin-top:16px; color:var(--text-primary); font-weight:500;">Загрузка...</p>
+  <!-- Иконки -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="svg-sprite" aria-hidden="true">
+    <symbol id="i-mark" viewBox="0 0 24 24">
+      <rect x="3.25" y="4.5" width="17.5" height="16" rx="3" />
+      <path d="M7.5 2.75v3.5M16.5 2.75v3.5M3.5 9.25h17" />
+      <path d="m10.2 12.4 4.3 2.55-4.3 2.55v-5.1Z" fill="currentColor" stroke="none" />
+    </symbol>
+    <symbol id="i-schedule" viewBox="0 0 24 24">
+      <rect x="3.5" y="4.75" width="17" height="16" rx="2.6" />
+      <path d="M8 2.75v4M16 2.75v4M3.75 9.5h16.5" />
+      <path d="M7.75 13h2.5M13.75 13h2.5M7.75 17h2.5M13.75 17h2.5" />
+    </symbol>
+    <symbol id="i-songs" viewBox="0 0 24 24">
+      <path d="M9 18V6.2l10-2v11.6" />
+      <circle cx="6.5" cy="18" r="2.5" />
+      <circle cx="16.5" cy="15.8" r="2.5" />
+    </symbol>
+    <symbol id="i-stats" viewBox="0 0 24 24">
+      <path d="M4 20h16" />
+      <rect x="4.5" y="12" width="3.6" height="5" rx="1" />
+      <rect x="10.2" y="7.5" width="3.6" height="9.5" rx="1" />
+      <rect x="15.9" y="4" width="3.6" height="13" rx="1" />
+    </symbol>
+    <symbol id="i-users" viewBox="0 0 24 24">
+      <circle cx="9.5" cy="8" r="3.2" />
+      <path d="M3.5 20c0-3.2 2.7-5.5 6-5.5s6 2.3 6 5.5" />
+      <path d="M16 5.2a3 3 0 0 1 0 5.6M17.5 14.8c2 .7 3.5 2.4 3.5 5.2" />
+    </symbol>
+    <symbol id="i-sync" viewBox="0 0 24 24">
+      <path d="M20 8.5A8.2 8.2 0 0 0 5.6 6.6L4 8.2" />
+      <path d="M4 4.2v4h4M4 15.5a8.2 8.2 0 0 0 14.4 1.9l1.6-1.6" />
+      <path d="M20 19.8v-4h-4" />
+    </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" />
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24">
+      <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z" />
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14" />
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4 4" />
+    </symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24">
+      <path d="m6 6 12 12M18 6 6 18" />
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="m5 12.5 4.2 4.2L19 7" />
+    </symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24">
+      <path d="m6 9.5 6 6 6-6" />
+    </symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24">
+      <path d="m9.5 6 6 6-6 6" />
+    </symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24">
+      <path d="m14.5 6-6 6 6 6" />
+    </symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24">
+      <path d="M4 20h4.2L19 9.2a2.2 2.2 0 0 0-3.1-3.1L5 17.8V20Z" />
+      <path d="m13.8 8.2 2.9 2.9" />
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+      <path d="M4.5 7h15M9.5 3.8h5M7 7l.8 13h8.4L17 7M10 10.5v6M14 10.5v6" />
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24">
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M16 5.5A2.5 2.5 0 0 0 13.5 3H6a2 2 0 0 0-2 2v8" />
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M12 3v12M7 10.5l5 5 5-5M4.5 20h15" />
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24">
+      <rect x="4.5" y="10" width="15" height="11" rx="2.5" />
+      <path d="M8 10V7.5a4 4 0 0 1 8 0V10" />
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 24 24">
+      <circle cx="8" cy="15.5" r="3.5" />
+      <path d="m10.5 13 8-8M16 7.5l2 2M18.5 5l2 2" />
+    </symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24">
+      <path d="M12 3 5 6v5.5c0 4.3 2.8 7.7 7 9.5 4.2-1.8 7-5.2 7-9.5V6l-7-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24">
+      <path d="M12 3.5 21 20H3L12 3.5Z" />
+      <path d="M12 9v5M12 17.2v.1" />
+    </symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24">
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.6" />
+    </symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24">
+      <path d="M3 3l18 18" />
+      <path d="M10.6 6.2A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a15 15 0 0 1-3.2 3.7M6.2 7.3A15.3 15.3 0 0 0 2.5 12s3.5 6 9.5 6c1.5 0 2.9-.4 4.1-1" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24">
+      <path d="M4 12h16M14 6l6 6-6 6" />
+    </symbol>
+    <symbol id="i-arrow-up-right" viewBox="0 0 24 24">
+      <path d="M7 17 17 7M8 7h9v9" />
+    </symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24">
+      <path d="M3.5 5h17l-6.5 7.5V19l-4 2v-8.5L3.5 5Z" />
+    </symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M8 3v4M16 3v4M3.75 9.5h16.5" />
+    </symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24">
+      <path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14" />
+      <path d="M10 8l-4 4 4 4M6 12h10" />
+    </symbol>
+    <symbol id="i-user-plus" viewBox="0 0 24 24">
+      <circle cx="9.5" cy="8" r="3.2" />
+      <path d="M3.5 20.5c0-3.3 2.7-5.7 6-5.7 1.4 0 2.7.4 3.7 1.2M18 13.5v6M15 16.5h6" />
+    </symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24">
+      <circle cx="9" cy="6" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="6" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="18" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="18" r="1" fill="currentColor" stroke="none" />
+    </symbol>
+    <symbol id="i-spreadsheet" viewBox="0 0 24 24">
+      <rect x="4" y="3.5" width="16" height="17" rx="2" />
+      <path d="M4 9h16M4 14.5h16M10 9v11.5" />
+    </symbol>
+    <symbol id="i-info" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5M12 7.8v.2" />
+    </symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24">
+      <path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9 12 3.5Z" />
+      <path d="M19 17.5v3M17.5 19h3" />
+    </symbol>
+  </svg>
+
+  <div class="app">
+    <!-- Боковая навигация -->
+    <aside class="sidebar" id="sidebar" aria-label="Основная навигация">
+      <a class="brand" href="#schedule" data-page="schedule">
+        <span class="brand__mark"><svg class="icon"><use href="#i-mark"></use></svg></span>
+        <span class="brand__text">
+          <span class="brand__name">MediaHLG</span>
+          <span class="brand__sub">Duty &amp; repertoire</span>
+        </span>
+      </a>
+
+      <div class="workspace-card">
+        <span class="workspace-card__dot"></span>
+        <span class="workspace-card__text">
+          <strong>Медиа-служение</strong>
+          <small>Основное пространство</small>
+        </span>
+        <svg class="icon workspace-card__chev"><use href="#i-chevron-down"></use></svg>
+      </div>
+
+      <nav class="nav">
+        <p class="nav__label">Рабочее пространство</p>
+        <button class="nav__item" data-page="schedule">
+          <svg class="icon"><use href="#i-schedule"></use></svg>
+          <span>График</span>
+          <span class="nav__count" id="nav-schedule-count">0</span>
+        </button>
+        <button class="nav__item" data-page="songs">
+          <svg class="icon"><use href="#i-songs"></use></svg>
+          <span>Песни</span>
+          <span class="nav__count" id="nav-songs-count">0</span>
+        </button>
+        <button class="nav__item" data-page="stats">
+          <svg class="icon"><use href="#i-stats"></use></svg>
+          <span>Статистика</span>
+        </button>
+
+        <p class="nav__label nav__label--gap admin-only">Администрирование</p>
+        <button class="nav__item admin-only" data-page="users">
+          <svg class="icon"><use href="#i-users"></use></svg>
+          <span>Пользователи</span>
+        </button>
+        <button class="nav__item admin-only" data-page="sync">
+          <svg class="icon"><use href="#i-sync"></use></svg>
+          <span>Синхронизация</span>
+          <span class="nav__live" title="Нет ошибок"></span>
+        </button>
+      </nav>
+
+      <div class="sidebar__foot">
+        <div class="sidebar__status">
+          <div class="sidebar__status-head">
+            <span class="pulse-dot"></span>
+            <strong id="sidebar-sync-title">Всё синхронизировано</strong>
+          </div>
+          <p id="sidebar-sync-text">Данные из таблицы</p>
+          <button class="sidebar__status-link admin-only" data-page="sync">
+            Открыть журнал
+            <svg class="icon"><use href="#i-arrow-right"></use></svg>
+          </button>
+        </div>
+        <p class="sidebar__version">MediaHLG · v2.0</p>
+      </div>
+    </aside>
+
+    <div class="sidebar-scrim" id="sidebar-scrim" hidden></div>
+
+    <div class="workspace">
+      <!-- Верхняя панель -->
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menu-btn" aria-label="Открыть меню" aria-expanded="false">
+          <svg class="icon"><use href="#i-menu"></use></svg>
+        </button>
+
+        <div class="topbar__context">
+          <span class="topbar__eyebrow">Рабочее пространство</span>
+          <h2 class="topbar__title" id="page-title">График дежурств</h2>
+        </div>
+
+        <button class="icon-btn" id="theme-toggle" aria-label="Переключить тему">
+          <svg class="icon" id="theme-icon"><use href="#i-moon"></use></svg>
+        </button>
+
+        <div class="profile" id="profile">
+          <button class="profile-chip" id="profile-btn" aria-haspopup="menu" aria-expanded="false">
+            <span class="avatar avatar--lg" id="profile-avatar">А</span>
+            <span class="profile-chip__text">
+              <strong id="profile-name">Александр</strong>
+              <small id="profile-role">Администратор</small>
+            </span>
+            <svg class="icon profile-chip__chev"><use href="#i-chevron-down"></use></svg>
+          </button>
+          <div class="popover" id="profile-popover" role="menu" aria-label="Профиль"></div>
+        </div>
+      </header>
+
+      <main class="main" id="main">
+        <!-- ГРАФИК -->
+        <section class="page active" id="page-schedule" aria-labelledby="schedule-title">
+          <div class="page-head">
+            <div class="page-head__text">
+              <p class="eyebrow" id="schedule-period"><span class="status-dot"></span> Загрузка</p>
+              <h1 id="schedule-title">График дежурств</h1>
+              <p class="lead" id="schedule-lead">Загрузка…</p>
+            </div>
+            <div class="page-head__actions">
+              <button class="btn btn--primary admin-only" id="head-add-date">
+                <svg class="icon"><use href="#i-plus"></use></svg>
+                Добавить дату
+              </button>
+            </div>
+          </div>
+
+          <section class="spotlight" id="spotlight" aria-label="Ближайшее дежурство"></section>
+
+          <div class="toolbar">
+            <div class="segmented" role="tablist" aria-label="Разделы графика">
+              <button class="active" data-schedule-tab="upcoming" role="tab" aria-selected="true">
+                Актуальные <span class="seg-count" id="count-upcoming">0</span>
+              </button>
+              <button data-schedule-tab="archive" role="tab" aria-selected="false">
+                Архив <span class="seg-count" id="count-archive">0</span>
+              </button>
+              <button data-schedule-tab="mine" role="tab" aria-selected="false">
+                Мои дежурства <span class="seg-count" id="count-mine">0</span>
+              </button>
+            </div>
+            <div class="toolbar__right">
+              <div class="select-wrap">
+                <svg class="icon select-wrap__icon"><use href="#i-filter"></use></svg>
+                <select class="select select--with-icon" id="person-filter" aria-label="Фильтр по дежурному">
+                  <option value="">Все дежурные</option>
+                </select>
+              </div>
+              <button class="icon-btn" id="reset-filter" aria-label="Сбросить фильтр" title="Сбросить фильтр" hidden>
+                <svg class="icon"><use href="#i-close"></use></svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="dates-view" aria-live="polite"></div>
+          <div class="pagination" id="dates-pagination"></div>
+        </section>
+        <!-- ПЕСНИ -->
+        <section class="page" id="page-songs" aria-labelledby="songs-title">
+          <div class="page-head">
+            <div class="page-head__text">
+              <p class="eyebrow">Библиотека</p>
+              <h1 id="songs-title">Песни</h1>
+              <p class="lead" id="songs-lead">Тексты и репертуар</p>
+            </div>
+            <div class="page-head__actions">
+              <button class="btn btn--primary admin-only" id="head-add-song">
+                <svg class="icon"><use href="#i-plus"></use></svg>
+                Добавить песню
+              </button>
+            </div>
+          </div>
+
+          <div class="metrics" id="songs-metrics"></div>
+
+          <div class="toolbar toolbar--wrap">
+            <label class="field-search">
+              <svg class="icon"><use href="#i-search"></use></svg>
+              <input type="search" id="songs-search" placeholder="Название или строка из текста" autocomplete="off" />
+            </label>
+            <div class="segmented" id="songs-filter" role="tablist" aria-label="Фильтр песен">
+              <button class="active" data-song-filter="all" role="tab" aria-selected="true">Все</button>
+              <button data-song-filter="used" role="tab" aria-selected="false">В репертуаре</button>
+              <button data-song-filter="unused" role="tab" aria-selected="false">Не используются</button>
+            </div>
+            <div class="select-wrap">
+              <select class="select" id="songs-sort" aria-label="Сортировка песен">
+                <option value="title">По названию</option>
+                <option value="used">По частоте</option>
+                <option value="length">По длине текста</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="song-list" id="song-list" aria-live="polite"></div>
+          <div class="pagination" id="songs-pagination"></div>
+        </section>
+
+        <!-- СТАТИСТИКА -->
+        <section class="page" id="page-stats" aria-labelledby="stats-title">
+          <div class="page-head">
+            <div class="page-head__text">
+              <p class="eyebrow" id="stats-season">Сезон</p>
+              <h1 id="stats-title">Статистика</h1>
+              <p class="lead">Дежурства, активность и репертуар в одном срезе</p>
+            </div>
+            <div class="page-head__actions">
+              <span class="chip chip--soft">
+                <svg class="icon"><use href="#i-calendar"></use></svg>
+                Июнь — ноябрь
+              </span>
+            </div>
+          </div>
+
+          <div class="metrics" id="stats-metrics"></div>
+
+          <div class="stats-grid">
+            <section class="panel">
+              <header class="panel__head">
+                <div>
+                  <h2>Дежурства по месяцам</h2>
+                  <p>Количество назначений за сезон</p>
+                </div>
+                <span class="chip chip--accent" id="stats-trend">+20%</span>
+              </header>
+              <div class="bars" id="month-bars"></div>
+            </section>
+
+            <section class="panel">
+              <header class="panel__head">
+                <div>
+                  <h2>Распределение дежурств</h2>
+                  <p>Кто был назначен чаще</p>
+                </div>
+              </header>
+              <div class="donut-wrap">
+                <div class="donut" id="duty-donut">
+                  <div class="donut__hole">
+                    <strong id="donut-total">0</strong>
+                    <span>дежурств</span>
+                  </div>
+                </div>
+                <ul class="legend" id="duty-legend"></ul>
+              </div>
+            </section>
+          </div>
+
+          <div class="stats-grid stats-grid--lower">
+            <section class="panel">
+              <header class="panel__head">
+                <div>
+                  <h2>Топ репертуара</h2>
+                  <p>Песни, которые звучали чаще всего</p>
+                </div>
+              </header>
+              <div class="rank-list" id="top-songs"></div>
+            </section>
+
+            <section class="panel">
+              <header class="panel__head">
+                <div>
+                  <h2>Заполненность</h2>
+                  <p>Архив и свободные слоты</p>
+                </div>
+              </header>
+              <div class="fill-stats" id="fill-stats"></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ПОЛЬЗОВАТЕЛИ -->
+        <section class="page" id="page-users" aria-labelledby="users-title">
+          <div class="page-head">
+            <div class="page-head__text">
+              <p class="eyebrow">Администрирование</p>
+              <h1 id="users-title">Пользователи</h1>
+              <p class="lead">Роли, PIN-коды и доступ к управлению</p>
+            </div>
+            <div class="page-head__actions">
+              <button class="btn btn--primary" id="head-add-user">
+                <svg class="icon"><use href="#i-user-plus"></use></svg>
+                Добавить пользователя
+              </button>
+            </div>
+          </div>
+
+          <div class="metrics" id="users-metrics"></div>
+
+          <div class="table-card">
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Пользователь</th>
+                    <th>Роль</th>
+                    <th>Дежурства</th>
+                    <th>Доступ</th>
+                    <th class="ta-right">Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <p class="table-note">
+            <svg class="icon"><use href="#i-lock"></use></svg>
+            PIN хранится только как bcrypt-хеш и никогда не выгружается в Google Sheets.
+          </p>
+        </section>
+
+        <!-- СИНХРОНИЗАЦИЯ -->
+        <section class="page" id="page-sync" aria-labelledby="sync-title">
+          <div class="page-head">
+            <div class="page-head__text">
+              <p class="eyebrow">Администрирование</p>
+              <h1 id="sync-title">Синхронизация</h1>
+              <p class="lead">График и репертуар в Google Sheets</p>
+            </div>
+            <div class="page-head__actions">
+              <span class="chip chip--soft">
+                <span class="pulse-dot"></span>
+                Авто каждые 60 секунд
+              </span>
+            </div>
+          </div>
+
+          <div id="sync-hero"></div>
+          <div class="sync-grid" id="sync-cards"></div>
+
+          <section class="panel panel--flush">
+            <header class="panel__head panel__head--pad">
+              <div>
+                <h2>История запусков</h2>
+                <p>Кто и когда обновлял таблицу</p>
+              </div>
+              <button class="btn btn--ghost btn--sm" id="sync-refresh">
+                <svg class="icon"><use href="#i-sync"></use></svg>
+                Обновить
+              </button>
+            </header>
+            <div class="table-scroll">
+              <table class="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th>Когда</th>
+                    <th>Инициатор</th>
+                    <th>Изменения</th>
+                    <th>Длительность</th>
+                    <th>Статус</th>
+                  </tr>
+                </thead>
+                <tbody id="sync-tbody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </main>
     </div>
   </div>
-  <div class="container">
-    <!-- Шапка -->
-    <div class="header">
-      <h1>MediaHLG</h1>
-      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <div id="auth-section" style="display:flex; align-items:center; gap:8px;">
-          <button id="login-btn" class="auth-btn">🔑 Войти</button>
-          <span id="user-display" style="display:none; font-weight:500;"></span>
-          <button id="logout-btn"
-            style="display:none; padding:4px 10px; border:none; border-radius:6px; background:var(--bg-cell); cursor:pointer;">Выйти</button>
-        </div>
-        <button id="admin-panel-btn"
-          style="display:none; padding:4px 10px; border-radius:6px; border:none; background:#4f46e5; color:#fff; cursor:pointer; ">Управление
-          👥</button>
-        <button id="theme-toggle" class="theme-toggle">🌙</button>
+
+  <nav class="bottom-nav" id="bottom-nav" aria-label="Мобильная навигация">
+    <button class="bottom-nav__item" data-page="schedule">
+      <svg class="icon"><use href="#i-schedule"></use></svg>
+      <span>График</span>
+    </button>
+    <button class="bottom-nav__item" data-page="songs">
+      <svg class="icon"><use href="#i-songs"></use></svg>
+      <span>Песни</span>
+    </button>
+    <button class="bottom-nav__item" data-page="stats">
+      <svg class="icon"><use href="#i-stats"></use></svg>
+      <span>Статистика</span>
+    </button>
+    <button class="bottom-nav__item admin-only" data-page="users">
+      <svg class="icon"><use href="#i-users"></use></svg>
+      <span>Люди</span>
+    </button>
+    <button class="bottom-nav__item admin-only" data-page="sync">
+      <svg class="icon"><use href="#i-sync"></use></svg>
+      <span>Синк</span>
+    </button>
+  </nav>
+
+  <!-- Панель песни -->
+  <aside class="drawer" id="song-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true">
+    <div class="drawer__head">
+      <div class="drawer__head-text">
+        <p class="eyebrow" id="drawer-eyebrow">Песня</p>
+        <h2 id="drawer-title">Название</h2>
+        <p class="drawer__meta" id="drawer-meta"></p>
       </div>
+      <button class="icon-btn" id="drawer-close" aria-label="Закрыть панель">
+        <svg class="icon"><use href="#i-close"></use></svg>
+      </button>
     </div>
+    <div class="drawer__body" id="drawer-body"></div>
+    <div class="drawer__foot" id="drawer-foot"></div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
 
-    <!-- Вкладки -->
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="schedule">📋 График</button>
-    </div>
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
-    <!-- Контейнер для загрузки -->
-    <div id="loading" class="table-wrapper">
-      <div style="padding:20px; text-align:center;">
-        <span class="spinner"></span> Загрузка...
+  <!-- Вход -->
+  <div class="modal" id="login-modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="login-modal"></div>
+    <div class="modal__card modal__card--sm" role="dialog" aria-modal="true" aria-labelledby="login-title">
+      <button class="icon-btn modal__close" data-close-modal="login-modal" aria-label="Закрыть">
+        <svg class="icon"><use href="#i-close"></use></svg>
+      </button>
+      <div class="login-head">
+        <span class="brand__mark brand__mark--lg"><svg class="icon"><use href="#i-mark"></use></svg></span>
+        <p class="eyebrow">MediaHLG</p>
+        <h2 id="login-title">Вход в систему</h2>
+        <p>Выберите пользователя и введите PIN-код</p>
       </div>
-    </div>
-
-    <!-- Вкладка: График -->
-    <div id="tab-schedule" class="tab-content active">
-      <div id="main-section" class="section" style="display:none;">
-        <div class="section-title">
-          🟢 Актуальные даты
-          <span class="count" id="main-count"></span>
-          <button id="manage-songs-btn"
-            style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">🎵
-            Управление песнями</button>
-          <button id="add-date-btn"
-            style="display:none; padding:6px 14px; border-radius:8px; border:none; background:#4f46e5; color:#fff; cursor:pointer; font-size:0.9rem;">➕
-            Добавить дату</button>
+      <form class="login-form" id="login-form" novalidate>
+        <div class="field">
+          <span class="field__label">Пользователь</span>
+          <div class="user-picker" id="login-user-list" role="listbox" aria-label="Выбор пользователя"></div>
         </div>
-        <div id="main-table-container"></div>
-        <div id="main-pagination" class="pagination"></div>
-      </div>
-
-      <div id="stats-section" class="section" style="display:none;">
-        <div class="section-title">
-          📊 Статистика дежурств
-          <span class="count" id="stats-count"></span>
-        </div>
-        <div id="stats-container" class="stats-grid"></div>
-        <div id="chart-container" class="chart-wrapper">
-          <canvas id="chartCanvas" width="400" height="400"></canvas>
-        </div>
-      </div>
-
-      <div id="archive-section" class="section" style="display:none;">
-        <div class="section-title">
-          📦 Архив
-          <span class="count" id="archive-count"></span>
-        </div>
-        <div id="archive-table-container" class="archive-table"></div>
-      </div>
-    </div>
-
-    <!-- Модальное окно входа -->
-    <div id="login-modal" class="modal-overlay">
-      <div class="modal-content small">
-        <div class="modal-header">
-          <h3>🔐 Вход в систему</h3>
-          <button class="modal-close-btn" id="login-close-btn">✕</button>
-        </div>
-        <div class="modal-body">
-          <label style="display:block; margin-top:8px;">Выберите пользователя</label>
-          <select id="login-user-select" class="modal-select">
-            <option value="">— Выберите —</option>
-          </select>
-          <label style="display:block; margin-top:12px;">PIN-код</label>
-          <input type="password" id="login-pin-input" placeholder="Введите PIN" class="modal-input">
-          <div id="login-error" class="modal-error"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="login-cancel">Отмена</button>
-          <button class="btn-primary" id="login-confirm">Войти</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно управления пользователями (админ) -->
-    <div id="admin-modal" class="modal-overlay">
-      <div class="modal-content wide">
-        <div class="modal-header">
-          <h3>👥 Управление пользователями</h3>
-          <button class="modal-close-btn" id="admin-modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <!-- Поиск -->
-          <div style="margin-bottom:16px;">
-            <input type="text" id="admin-search-input" placeholder="Поиск пользователя..." class="modal-input">
-            <div id="admin-search-results" style="margin-top:4px;"></div>
-          </div>
-
-          <!-- Выбранный пользователь -->
-          <div id="admin-selected-user"
-            style="display:none; border-top:1px solid var(--border-color); padding-top:16px; margin-top:12px;">
-            <p><strong>Пользователь:</strong> <span id="admin-selected-name"></span></p>
-
-            <!-- Строка 1: Смена PIN и Удаление -->
-            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:8px;">
-              <input type="text" id="admin-new-pin" placeholder="Новый PIN" class="modal-input"
-                style="width:auto; flex:1; min-width:120px; max-width:200px;">
-              <button id="admin-change-pin-btn" class="btn-primary" style="padding:6px 14px;">Сменить PIN</button>
-              <button id="admin-delete-user-btn" class="btn-secondary"
-                style="padding:6px 14px; background:#ef4444; color:#fff;">Удалить</button>
-            </div>
-
-            <!-- Строка 2: Роль и кнопка обновления -->
-            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:12px;">
-              <div class="role-toggle-wrapper">
-                <input type="checkbox" id="admin-role-checkbox">
-                <label for="admin-role-checkbox" class="role-toggle-track"></label>
-                <span class="role-label" id="admin-role-label">👤 Пользователь</span>
-              </div>
-              <button id="admin-change-role-btn" class="btn-primary" style="padding:6px 14px;">Обновить роль</button>
-            </div>
-
-            <div id="admin-user-message" class="modal-error" style="margin-top:8px;"></div>
-          </div>
-
-          <!-- Создание пользователя -->
-          <div style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
-            <div id="admin-create-block" style="display:none; margin-top:12px;">
-              <h4 style="margin-bottom:8px;">Создать пользователя</h4>
-              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-                <input type="text" id="admin-create-name" placeholder="Имя" class="modal-input"
-                  style="width:auto; flex:1; min-width:120px;">
-                <input type="text" id="admin-create-pin" placeholder="PIN" class="modal-input"
-                  style="width:auto; flex:1; min-width:80px;">
-                <button id="admin-create-user-btn" class="btn-primary" style="padding:6px 14px;">Создать</button>
-                <button id="admin-create-cancel-btn" class="btn-secondary" style="padding:6px 14px;">Отмена</button>
-              </div>
-              <div id="admin-create-error" class="modal-error"></div>
-            </div>
-          </div>
-
-          <!-- Кнопка синхронизации -->
-          <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
-            <button id="admin-sync-history-btn" class="btn-secondary" style="padding:6px 14px;">📋 История
-              синхронизаций</button>
-            <button id="admin-sync-btn" class="btn-primary" style="background:#f59e0b; color:#fff;">🔄 Запустить
-              синхронизацию</button>
+        <div class="field">
+          <label class="field__label" for="login-pin">PIN-код</label>
+          <div class="pin-wrap">
+            <input class="input" id="login-pin" type="password" inputmode="numeric" maxlength="12"
+              autocomplete="current-password" placeholder="••••" />
+            <button class="pin-eye" type="button" id="login-eye" aria-label="Показать PIN-код" aria-pressed="false">
+              <svg class="icon"><use href="#i-eye"></use></svg>
+            </button>
           </div>
         </div>
+        <p class="form-error" id="login-error" role="alert"></p>
+        <button class="btn btn--primary btn--block" type="submit" id="login-submit">Войти</button>
+      </form>
+      <div class="login-foot">
+        <span>PIN-код выдаёт администратор</span>
+        <button class="link-btn" type="button" id="login-guest">Продолжить как гость</button>
       </div>
     </div>
-
-    <!-- Модальное окно управления песнями (список + кнопка Добавить) -->
-    <div id="songs-modal" class="modal-overlay">
-      <div class="modal-content wide">
-        <div class="modal-header">
-          <h3>🎵 Управление песнями</h3>
-          <button class="modal-close-btn" id="songs-modal-close">✕</button>
+  </div>
+  <!-- Управление датой -->
+  <div class="modal" id="date-modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="date-modal"></div>
+    <div class="modal__card modal__card--wide" role="dialog" aria-modal="true" aria-labelledby="date-modal-title">
+      <div class="modal__head">
+        <div>
+          <p class="eyebrow" id="date-modal-eyebrow">Управление датой</p>
+          <h2 id="date-modal-title">Дата</h2>
         </div>
-        <div class="modal-body">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h4 style="margin:0;">Список песен</h4>
-            <button id="open-add-song-btn" class="btn-primary" style="padding:6px 14px;">➕ Добавить</button>
+        <button class="icon-btn modal__close" data-close-modal="date-modal" aria-label="Закрыть">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+      <div class="modal__body" id="date-modal-body"></div>
+      <div class="modal__foot" id="date-modal-foot"></div>
+    </div>
+  </div>
+
+  <!-- Новая дата -->
+  <div class="modal" id="add-date-modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="add-date-modal"></div>
+    <div class="modal__card modal__card--sm" role="dialog" aria-modal="true" aria-labelledby="add-date-title">
+      <div class="modal__head">
+        <div>
+          <p class="eyebrow">Новая запись</p>
+          <h2 id="add-date-title">Добавить дату</h2>
+        </div>
+        <button class="icon-btn modal__close" data-close-modal="add-date-modal" aria-label="Закрыть">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="field">
+          <label class="field__label" for="add-date-input">Дата и пояснение</label>
+          <input class="input" id="add-date-input" placeholder="10.10.2026 (утро 10-12)" autocomplete="off" />
+        </div>
+        <div class="preset-row" id="add-date-presets">
+          <button type="button" class="chip chip--button" data-preset="06.12.2026 (утро 10-12)">06.12 · утро</button>
+          <button type="button" class="chip chip--button" data-preset="13.12.2026">13.12</button>
+          <button type="button" class="chip chip--button" data-preset="20.12.2026 (вечер 18-20)">20.12 · вечер</button>
+        </div>
+        <p class="muted-text">Цветовая метка синхронизируется из Google Sheets.</p>
+        <p class="form-error" id="add-date-error" role="alert"></p>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn--ghost" type="button" data-close-modal="add-date-modal">Отмена</button>
+        <button class="btn btn--primary" type="button" id="add-date-save">
+          <svg class="icon"><use href="#i-plus"></use></svg>
+          Создать
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Песня: создание и редактирование -->
+  <div class="modal" id="song-modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="song-modal"></div>
+    <div class="modal__card modal__card--wide" role="dialog" aria-modal="true" aria-labelledby="song-modal-title">
+      <div class="modal__head">
+        <div>
+          <p class="eyebrow" id="song-modal-eyebrow">Библиотека</p>
+          <h2 id="song-modal-title">Добавить песню</h2>
+        </div>
+        <button class="icon-btn modal__close" data-close-modal="song-modal" aria-label="Закрыть">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="field">
+          <label class="field__label" for="song-name">Название</label>
+          <input class="input" id="song-name" placeholder="Например, «Великий Бог»" autocomplete="off" />
+        </div>
+        <div class="field field--last">
+          <label class="field__label" for="song-text">Текст песни</label>
+          <textarea class="textarea" id="song-text" rows="12" placeholder="Куплеты и припев…"></textarea>
+        </div>
+        <p class="form-error" id="song-error" role="alert"></p>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn--ghost" type="button" data-close-modal="song-modal">Отмена</button>
+        <button class="btn btn--primary" type="button" id="song-save">
+          <svg class="icon"><use href="#i-check"></use></svg>
+          Сохранить
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Новый пользователь -->
+  <div class="modal" id="user-modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="user-modal"></div>
+    <div class="modal__card modal__card--sm" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+      <div class="modal__head">
+        <div>
+          <p class="eyebrow">Доступ</p>
+          <h2 id="user-modal-title">Новый пользователь</h2>
+        </div>
+        <button class="icon-btn modal__close" data-close-modal="user-modal" aria-label="Закрыть">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="field">
+          <label class="field__label" for="user-name">Имя</label>
+          <input class="input" id="user-name" placeholder="Имя пользователя" autocomplete="off" />
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field__label" for="user-pin">PIN-код</label>
+            <input class="input" id="user-pin" inputmode="numeric" maxlength="12" placeholder="Минимум 4 цифры" />
           </div>
-          <input type="text" id="songs-filter-input" placeholder="Фильтр по названию" class="modal-input"
-            style="margin-bottom:8px;">
-          <div id="songs-list-container"></div>
-          <div id="songs-pagination" class="pagination" style="margin-top:12px;"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно добавления новой песни -->
-    <div id="add-song-modal" class="modal-overlay">
-      <div class="modal-content wide" style="max-width:600px;">
-        <div class="modal-header">
-          <h3>➕ Добавить новую песню</h3>
-          <button class="modal-close-btn" id="add-song-modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <label style="display:block; margin-top:8px;">Название песни</label>
-          <input type="text" id="add-song-name-input" placeholder="Введите название" class="modal-input">
-          <label style="display:block; margin-top:12px;">Текст песни (по желанию)</label>
-          <textarea id="add-song-text-input" placeholder="Введите текст песни..." rows="15"
-            class="modal-textarea"></textarea>
-          <div id="add-song-modal-error" class="modal-error"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="add-song-modal-cancel">Отмена</button>
-          <button class="btn-primary" id="add-song-modal-save">💾 Добавить</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно редактирования песни -->
-    <div id="edit-song-modal" class="modal-overlay">
-      <div class="modal-content wide" style="max-width:900px;">
-        <div class="modal-header">
-          <h3 id="edit-song-title">✏️ Редактирование песни</h3>
-          <button class="modal-close-btn" id="edit-song-close-btn">✕</button>
-        </div>
-        <div class="modal-body">
-          <p style="color:var(--text-muted); margin-bottom:8px;"><strong id="edit-song-name-display"></strong></p>
-          <textarea id="edit-song-textarea" rows="15" class="modal-textarea"
-            style="min-height:300px; font-size:1rem; line-height:1.6;"></textarea>
-          <div id="edit-song-error" class="modal-error"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="edit-song-cancel">Отмена</button>
-          <button class="btn-primary" id="edit-song-save">💾 Сохранить</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно редактирования даты (админ) -->
-    <div id="edit-date-modal" class="modal-overlay">
-      <div class="modal-content wide">
-        <div class="modal-header">
-          <h3>✏️ Редактирование даты <span id="edit-date-title" class="edit-date-title"></span></h3>
-          <button class="modal-close-btn" id="edit-date-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <section class="edit-date-section">
-            <div class="edit-date-section-title">Дата</div>
-            <div class="edit-date-rename-row">
-              <input type="text" id="edit-date-input" class="modal-input" autocomplete="off">
-              <button type="button" id="edit-date-save" class="btn-primary btn-compact">💾 Сохранить</button>
-            </div>
-            <div id="edit-date-error" class="modal-error"></div>
-          </section>
-
-          <section class="edit-date-section">
-            <div class="edit-date-section-title">
-              👥 Дежурные
-              <span class="edit-date-hint">до <span id="edit-date-max"></span></span>
-            </div>
-            <div id="edit-date-duty-list" class="duty-select-list"></div>
-            <div id="edit-date-duty-error" class="modal-error"></div>
-            <button type="button" id="edit-date-duty-save" class="btn-primary btn-compact">💾 Сохранить
-              дежурных</button>
-          </section>
-
-          <section class="edit-date-section">
-            <div class="edit-date-section-title">🎵 Репертуар</div>
-            <div id="edit-date-repertoire" class="edit-date-repertoire"></div>
-            <button type="button" id="edit-date-add-song" class="add-song-to-date-btn">+ Добавить песню</button>
-          </section>
-
-          <section class="edit-date-section edit-date-danger-zone">
-            <button type="button" id="edit-date-delete" class="btn-danger">🗑️ Удалить дату</button>
-          </section>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="edit-date-close-btn">Закрыть</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно добавления песни в репертуар даты -->
-    <div id="add-repertoire-song-modal" class="modal-overlay">
-      <div class="modal-content small">
-        <div class="modal-header">
-          <h3>🎵 Добавить песню на дату</h3>
-          <button class="modal-close-btn" id="add-repertoire-song-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p style="color:var(--text-muted); font-size:0.9rem;">Введите название песни</p>
-          <div class="song-suggest-wrap">
-            <input type="text" id="repertoire-song-input" placeholder="Начните вводить название..." class="modal-input"
-              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            <div id="repertoire-song-suggestions" class="song-suggestions" role="listbox"
-              aria-label="Подходящие песни"></div>
+          <div class="field">
+            <label class="field__label" for="user-role">Роль</label>
+            <select class="select select--block" id="user-role">
+              <option value="user">Участник</option>
+              <option value="admin">Администратор</option>
+            </select>
           </div>
-          <div id="add-repertoire-song-error" class="modal-error"></div>
         </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="add-repertoire-song-cancel">Отмена</button>
-          <button class="btn-primary" id="add-repertoire-song-confirm">Добавить</button>
-        </div>
+        <p class="form-error" id="user-error" role="alert"></p>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn--ghost" type="button" data-close-modal="user-modal">Отмена</button>
+        <button class="btn btn--primary" type="button" id="user-save">
+          <svg class="icon"><use href="#i-user-plus"></use></svg>
+          Создать
+        </button>
       </div>
     </div>
+  </div>
 
-    <!-- Модальное окно просмотра текста песни -->
-    <div id="view-song-text-modal" class="modal-overlay">
-      <div class="modal-content wide" style="max-width:700px;">
-        <div class="modal-header">
-          <h3 id="view-song-title">🎵 Текст песни</h3>
-          <button class="modal-close-btn" id="view-song-modal-close">✕</button>
+  <!-- Смена PIN -->
+  <div class="modal" id="pin-modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="pin-modal"></div>
+    <div class="modal__card modal__card--sm" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
+      <div class="modal__head">
+        <div>
+          <p class="eyebrow">Безопасность</p>
+          <h2 id="pin-modal-title">Сменить PIN</h2>
         </div>
-        <div class="modal-body">
-          <div style="margin-bottom:12px;">
-            <strong id="view-song-name-display"></strong>
-          </div>
-          <div id="view-song-text-content"
-            style="white-space:pre-wrap; max-height:400px; overflow-y:auto; padding:12px; background:var(--bg-cell); border-radius:8px; font-family:monospace; font-size:0.95rem; line-height:1.6;">
-          </div>
-          <div id="view-song-text-error" class="modal-error"></div>
+        <button class="icon-btn modal__close" data-close-modal="pin-modal" aria-label="Закрыть">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <p class="modal__text" id="pin-modal-user"></p>
+        <div class="field field--last">
+          <label class="field__label" for="pin-new">Новый PIN-код</label>
+          <input class="input" id="pin-new" inputmode="numeric" maxlength="12" placeholder="Минимум 4 цифры" />
         </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="view-song-modal-close-btn">Закрыть</button>
-          <button class="btn-primary" id="view-song-copy-btn">📋 Копировать текст</button>
-        </div>
+        <p class="form-error" id="pin-error" role="alert"></p>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn--ghost" type="button" data-close-modal="pin-modal">Отмена</button>
+        <button class="btn btn--primary" type="button" id="pin-save">Сохранить PIN</button>
       </div>
     </div>
+  </div>
 
-    <div id="add-date-modal" class="modal-overlay">
-      <div class="modal-content small">
-        <div class="modal-header">
-          <h3>➕ Добавить дату</h3>
-          <button class="modal-close-btn" id="add-date-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:8px;">
-            Формат: <strong>ДД.ММ.ГГГГ</strong>. По желанию можно дописать пояснение в скобках.
-          </p>
-          <input type="text" id="add-date-input" placeholder="10.10.2026 (утро 10-12)" class="modal-input"
-            autocomplete="off">
-          <div id="add-date-error" class="modal-error"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="add-date-cancel">Отмена</button>
-          <button class="btn-primary" id="add-date-confirm">Добавить</button>
-        </div>
+  <!-- Подтверждение -->
+  <div class="modal" id="confirm-modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal="confirm-modal"></div>
+    <div class="modal__card modal__card--sm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div class="modal__body modal__body--confirm">
+        <span class="confirm-icon"><svg class="icon"><use href="#i-alert"></use></svg></span>
+        <h2 id="confirm-title">Удалить?</h2>
+        <p id="confirm-text">Действие нельзя отменить.</p>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn--ghost" type="button" data-close-modal="confirm-modal">Отмена</button>
+        <button class="btn btn--danger" type="button" id="confirm-yes">Удалить</button>
       </div>
     </div>
-
-    <div id="sync-history-modal" class="modal-overlay">
-      <div class="modal-content wide">
-        <div class="modal-header">
-          <h3>📋 История синхронизаций</h3>
-          <button class="modal-close-btn" id="sync-history-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <div id="sync-history-list"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Подключаем конфиг -->
-    <script src="config.js"></script>
-
-    <script>
-      // ---------- Глобальные переменные ----------
-      let allDates = [];
-      let futureDates = [];
-      let pastDates = [];
-      let currentPage = 0;
-      let repertoireData = {};
-      let expandedRepertoireDates = new Set();
-      let currentUser = '';
-      let authToken = '';   // вместо PIN: сам PIN в браузере больше не хранится
-      let isAdmin = false;
-      let allSongs = [];
-      let songsCurrentPage = 0;
-      let filteredSongs = [];
-      let currentEditSongName = '';
-
-      // ---------- Toast-уведомления ----------
-      function showNotification(message, type = 'info', duration = 3000) {
-        const container = document.getElementById('toast-container');
-        const icons = {
-          success: '✅',
-          error: '❌',
-          warning: '⚠️',
-          info: 'ℹ️'
-        };
-
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML = `
-    <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
-    <span class="toast-message">${escapeHtml(message)}</span>
-    <button class="toast-close">&times;</button>
-  `;
-
-        // Закрытие по кнопке
-        toast.querySelector('.toast-close').addEventListener('click', () => {
-          toast.remove();
-        });
-
-        container.appendChild(toast);
-
-        // Автоматическое удаление через duration
-        setTimeout(() => {
-          if (toast.parentNode) toast.remove();
-        }, duration);
-      }
-
-      // ---------- Экранирование HTML ----------
-      function escapeHtml(value) {
-        return String(value == null ? '' : value)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;');
-      }
-
-      // ---------- Дата/время в часовом поясе пользователя ----------
-      function formatDateTime(value) {
-        if (!value) return '—';
-        // Сервер отдаёт время в UTC. Если смещение не указано — считаем его UTC,
-        // иначе браузер принял бы его за локальное время пользователя.
-        const naive = typeof value === 'string' &&
-          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value);
-        const d = new Date(naive ? value + 'Z' : value);
-        if (isNaN(d.getTime())) return String(value);
-        return d.toLocaleString(undefined, {
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit',
-          timeZoneName: 'short'
-        });
-      }
-
-      // ---------- Глобальный индикатор загрузки ----------
-      let loaderTimeout = null;
-
-      function showGlobalLoader() {
-        const loader = document.getElementById('global-loader');
-        loader.style.display = 'flex';
-        if (loaderTimeout) clearTimeout(loaderTimeout);
-        loaderTimeout = setTimeout(() => {
-          hideGlobalLoader();
-          showNotification('Превышено время ожидания ответа от сервера. Попробуйте ещё раз.', 'warning');
-        }, 10000);
-      }
-
-      function hideGlobalLoader() {
-        const loader = document.getElementById('global-loader');
-        loader.style.display = 'none';
-        if (loaderTimeout) {
-          clearTimeout(loaderTimeout);
-          loaderTimeout = null;
-        }
-      }
-
-      // ---------- Инициализация темы ----------
-      function getSystemTheme() {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
-
-      function applyTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-        const btn = document.getElementById('theme-toggle');
-        if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
-      }
-
-      function toggleTheme() {
-        const current = document.documentElement.getAttribute('data-theme') || 'light';
-        const next = current === 'light' ? 'dark' : 'light';
-        applyTheme(next);
-      }
-
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) {
-        applyTheme(savedTheme);
-      } else {
-        applyTheme(getSystemTheme());
-      }
-
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        if (!localStorage.getItem('theme')) {
-          applyTheme(e.matches ? 'dark' : 'light');
-        }
-      });
-
-      document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-
-      // ---------- Закрытие модальных окон ----------
-      function closeModal(modal) {
-        if (modal) modal.style.display = 'none';
-      }
-
-      document.querySelectorAll('.modal-close-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-          const modal = this.closest('.modal-overlay');
-          closeModal(modal);
-        });
-      });
-
-      document.querySelectorAll('.modal-overlay').forEach(overlay => {
-        overlay.addEventListener('click', function (e) {
-          if (e.target === this) {
-            closeModal(this);
-          }
-        });
-      });
-
-      // ---------- API-вызовы (новые) ----------
-      // Токен подставляется во все запросы. PIN по сети ходит только один раз —
-      // в /auth/login, поэтому в адресах его больше нет (и в логах nginx тоже).
-      async function apiFetch(path, options) {
-        const opts = Object.assign({}, options || {});
-        if (authToken) {
-          opts.headers = Object.assign({}, opts.headers || {}, {
-            'Authorization': 'Bearer ' + authToken
-          });
-        }
-        const resp = await fetch(API_URL + path, opts);
-        if (resp.status === 401) {
-          handleSessionExpired();
-        }
-        return resp;
-      }
-
-      function handleSessionExpired() {
-        if (!currentUser && !authToken) return;
-        logoutUser();
-        showNotification('Сессия истекла, войдите заново', 'warning');
-        showLoginModal();
-      }
-
-      async function loadUsers() {
-        const resp = await fetch(API_URL + '/auth/getUserNames');
-        const data = await resp.json();
-        if (data.error) {
-          showNotification('Не удалось загрузить список пользователей. Проверьте соединение.', 'error')
-          return [];
-        }
-        return data.names || [];
-      }
-
-      async function loadUsersForAdmin() {
-        const resp = await apiFetch('/auth/getUsers');
-        const data = await resp.json();
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        return data.users || [];
-      }
-
-      // ---------- Авторизация ----------
-      function updateAuthUI() {
-        const loginBtn = document.getElementById('login-btn');
-        const userDisplay = document.getElementById('user-display');
-        const logoutBtn = document.getElementById('logout-btn');
-        const adminBtn = document.getElementById('admin-panel-btn');
-
-        if (currentUser) {
-          loginBtn.style.display = 'none';
-          userDisplay.textContent = '👤 ' + currentUser;
-          userDisplay.style.display = 'inline';
-          logoutBtn.style.display = 'inline';
-          adminBtn.style.display = isAdmin ? 'inline-block' : 'none';
-        } else {
-          loginBtn.style.display = 'inline';
-          userDisplay.style.display = 'none';
-          logoutBtn.style.display = 'none';
-          adminBtn.style.display = 'none';
-        }
-
-        const songsBtn = document.getElementById('manage-songs-btn');
-        if (currentUser && isAdmin) {
-          songsBtn.style.display = 'inline-block';
-        } else {
-          songsBtn.style.display = 'none';
-        }
-
-        const addDateBtn = document.getElementById('add-date-btn');
-        if (currentUser && isAdmin) {
-          addDateBtn.style.display = 'inline-block';
-        } else {
-          addDateBtn.style.display = 'none';
-        }
-      }
-
-      function clearSession() {
-        currentUser = '';
-        authToken = '';
-        isAdmin = false;
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('currentUserToken');
-        localStorage.removeItem('currentUserRole');
-        localStorage.removeItem('currentUserPin');   // формат до перехода на токены
-      }
-
-      function setUser(name, token, admin) {
-        currentUser = name;
-        authToken = token;
-        isAdmin = admin;
-        localStorage.setItem('currentUser', name);
-        localStorage.setItem('currentUserToken', token);
-        localStorage.setItem('currentUserRole', admin ? 'admin' : 'user');
-        updateAuthUI();
-        renderMainCards();
-        renderArchiveTable();
-      }
-
-      function logoutUser() {
-        clearSession();
-        updateAuthUI();
-        renderMainCards();
-        renderArchiveTable();
-      }
-
-      async function autoLogin() {
-        // Формат до перехода на токены: PIN в браузере больше не храним.
-        localStorage.removeItem('currentUserPin');
-
-        const savedToken = localStorage.getItem('currentUserToken');
-        if (!savedToken) return;
-
-        authToken = savedToken;
-        try {
-          const resp = await fetch(API_URL + '/auth/me', {
-            headers: { 'Authorization': 'Bearer ' + savedToken }
-          });
-          if (!resp.ok) {
-            // Токен истёк, либо пользователя удалили/разжаловали.
-            clearSession();
-            return;
-          }
-          const me = await resp.json();
-          currentUser = me.name;
-          isAdmin = me.role === 'admin';
-          localStorage.setItem('currentUser', me.name);
-          localStorage.setItem('currentUserRole', me.role);
-          updateAuthUI();
-          renderMainCards();
-          renderArchiveTable();
-        } catch (e) {
-          clearSession();
-        }
-      }
-
-      // ---------- Модальное окно входа ----------
-      async function showLoginModal() {
-        const modal = document.getElementById('login-modal');
-        const select = document.getElementById('login-user-select');
-        const pinInput = document.getElementById('login-pin-input');
-        const error = document.getElementById('login-error');
-        const confirmBtn = document.getElementById('login-confirm');
-        const cancelBtn = document.getElementById('login-cancel');
-
-        showGlobalLoader();
-        let namesList = [];
-        try {
-          namesList = await loadUsers();
-        } catch (e) {
-          console.error('Ошибка загрузки пользователей:', e);
-          showNotification('Не удалось загрузить список пользователей. Проверьте соединение.', 'error');
-          hideGlobalLoader();
-          return;
-        } finally {
-          hideGlobalLoader();
-        }
-
-        select.innerHTML = '<option value="">— Выберите —</option>';
-        namesList.forEach(name => {
-          const opt = document.createElement('option');
-          opt.value = name;
-          opt.textContent = name;
-          select.appendChild(opt);
-        });
-
-        pinInput.value = '';
-        error.style.display = 'none';
-        modal.style.display = 'flex';
-        pinInput.focus();
-
-        const onConfirm = async () => {
-          const name = select.value;
-          const pin = pinInput.value.trim();
-          if (!name) {
-            error.textContent = 'Выберите пользователя';
-            error.style.display = 'block';
-            return;
-          }
-          if (!pin) {
-            error.textContent = 'Введите PIN-код';
-            error.style.display = 'block';
-            return;
-          }
-          const originalText = confirmBtn.textContent;
-          confirmBtn.textContent = '⏳ Проверка...';
-          confirmBtn.disabled = true;
-          showGlobalLoader();
-
-          try {
-            const resp = await fetch(API_URL + '/auth/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: name, pin: pin })
-            });
-            const data = await resp.json().catch(() => ({}));
-            if (resp.ok && data.token) {
-              modal.style.display = 'none';
-              setUser(name, data.token, data.role === 'admin');
-            } else {
-              // 429 приходит от ограничения попыток входа: сервер сам говорит,
-              // сколько ждать, — показываем его текст.
-              let message = 'Не удалось войти, попробуйте ещё раз';
-              if (resp.status === 401) message = 'Неверный PIN-код';
-              if (resp.status === 429) {
-                message = typeof data.detail === 'string'
-                  ? data.detail
-                  : 'Слишком много неудачных попыток входа, попробуйте позже';
-              }
-              error.textContent = message;
-              error.style.display = 'block';
-              pinInput.value = '';
-              pinInput.focus();
-            }
-          } catch (e) {
-            error.textContent = 'Ошибка соединения';
-            error.style.display = 'block';
-            showNotification(e.message, 'error');
-          } finally {
-            hideGlobalLoader();
-            confirmBtn.textContent = originalText;
-            confirmBtn.disabled = false;
-          }
-        };
-
-        const onCancel = () => {
-          modal.style.display = 'none';
-        };
-
-        confirmBtn.onclick = onConfirm;
-        cancelBtn.onclick = onCancel;
-        pinInput.onkeydown = (e) => { if (e.key === 'Enter') onConfirm(); };
-        modal.addEventListener('click', function (e) {
-          if (e.target === this) onCancel();
-        });
-      }
-
-      document.getElementById('login-btn').addEventListener('click', showLoginModal);
-      document.getElementById('logout-btn').addEventListener('click', logoutUser);
-
-      // ---------- Управление пользователями (админ) ----------
-      let allUsers = [];
-      let selectedAdminUser = null;
-
-      document.getElementById('admin-panel-btn').addEventListener('click', async function () {
-        if (!isAdmin) return;
-        showGlobalLoader();
-        try {
-          const userList = await loadUsersForAdmin();
-          allUsers = userList;
-          selectedAdminUser = null;
-          renderAdminSearchResults('');
-          document.getElementById('admin-selected-user').style.display = 'none';
-          document.getElementById('admin-modal').style.display = 'flex';
-          document.getElementById('admin-create-block').style.display = 'none';
-          document.getElementById('admin-create-name').value = '';
-          document.getElementById('admin-create-pin').value = '';
-          document.getElementById('admin-create-error').style.display = 'none';
-        } catch (e) {
-          showNotification('Ошибка загрузки пользователей: ' + e.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      document.getElementById('admin-create-cancel-btn').addEventListener('click', function () {
-        const createBlock = document.getElementById('admin-create-block');
-        const addChip = document.getElementById('add-user-chip');
-        if (createBlock) {
-          createBlock.style.display = 'none';
-          if (addChip) addChip.style.display = 'inline-block';
-          document.getElementById('admin-create-name').value = '';
-          document.getElementById('admin-create-pin').value = '';
-          document.getElementById('admin-create-error').style.display = 'none';
-        }
-      });
-
-      function renderAdminSearchResults(query) {
-        const container = document.getElementById('admin-search-results');
-        const filtered = allUsers.filter(u => u.name.toLowerCase().includes(query.toLowerCase()));
-
-        let html = '';
-        if (filtered.length === 0 && query !== '') {
-          html = '<p style="color:var(--text-muted); margin-top:4px;">Пользователи не найдены</p>';
-        } else {
-          html = '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">';
-          filtered.forEach(u => {
-            html += `<span class="admin-user-chip" data-name="${escapeHtml(u.name)}" style="padding:4px 12px; border-radius:16px; background:var(--bg-cell); cursor:pointer; border:1px solid var(--border-color);">${escapeHtml(u.name)}</span>`;
-          });
-          const createBlock = document.getElementById('admin-create-block');
-          if (createBlock.style.display === 'none' || createBlock.style.display === '') {
-            html += `<span id="add-user-chip" class="admin-user-chip" style="padding:4px 12px; border-radius:16px; background:var(--bg-cell-selected); border-color:var(--border-selected); cursor:pointer;">➕ Добавить</span>`;
-          }
-          html += '</div>';
-        }
-        container.innerHTML = html;
-
-        // Обработчики для чипов пользователей
-        container.querySelectorAll('.admin-user-chip[data-name]').forEach(el => {
-          el.addEventListener('click', function () {
-            const name = this.dataset.name;
-            selectAdminUser(name);
-          });
-        });
-
-        // Обработчик для чипа "➕ Добавить"
-        const addChip = document.getElementById('add-user-chip');
-        if (addChip) {
-          addChip.addEventListener('click', function () {
-            showCreateUserBlock();
-          });
-        }
-      }
-
-      function showCreateUserBlock() {
-        const createBlock = document.getElementById('admin-create-block');
-        const addChip = document.getElementById('add-user-chip');
-        if (createBlock) {
-          createBlock.style.display = 'block';
-          if (addChip) addChip.style.display = 'none';
-          document.getElementById('admin-create-name').value = '';
-          document.getElementById('admin-create-pin').value = '';
-          document.getElementById('admin-create-error').style.display = 'none';
-          document.getElementById('admin-create-name').focus();
-        }
-      }
-
-      function selectAdminUser(name) {
-        const user = allUsers.find(u => u.name === name);
-        if (!user) return;
-        selectedAdminUser = user;
-        document.getElementById('admin-selected-name').textContent = user.name;
-        document.getElementById('admin-selected-user').style.display = 'block';
-        document.getElementById('admin-new-pin').value = '';
-        document.getElementById('admin-user-message').style.display = 'none';
-        const isAdmin = (user.role === 'admin');
-        document.getElementById('admin-role-checkbox').checked = isAdmin;
-        document.getElementById('admin-role-label').textContent = isAdmin ? '👑 Администратор' : '👤 Пользователь';;
-      }
-
-      // Обработчик поиска
-      document.getElementById('admin-search-input').addEventListener('input', function () {
-        renderAdminSearchResults(this.value);
-      });
-
-      // Смена PIN
-      document.getElementById('admin-change-pin-btn').addEventListener('click', async function () {
-        if (!selectedAdminUser) return;
-        const newPin = document.getElementById('admin-new-pin').value.trim();
-        if (!newPin) {
-          document.getElementById('admin-user-message').textContent = 'Введите новый PIN';
-          document.getElementById('admin-user-message').style.display = 'block';
-          return;
-        }
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch(`/users/${encodeURIComponent(selectedAdminUser.name)}/pin`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ new_pin: newPin })
-          });
-          const result = await resp.json();
-          if (!resp.ok) throw new Error(result.detail || 'Ошибка');
-          showNotification('PIN успешно обновлён', 'success');
-          document.getElementById('admin-user-message').style.display = 'none';
-          // Обновим список пользователей (перезагрузим)
-          const userList = await loadUsersForAdmin();
-          allUsers = userList;
-          renderAdminSearchResults(document.getElementById('admin-search-input').value);
-          // Если выбранный пользователь обновился, обновим отображение
-          const updated = allUsers.find(u => u.name === selectedAdminUser.name);
-          if (updated) {
-            selectedAdminUser = updated;
-            document.getElementById('admin-selected-name').textContent = updated.name;
-          }
-        } catch (e) {
-          document.getElementById('admin-user-message').textContent = e.message;
-          document.getElementById('admin-user-message').style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      // Смена роли
-      document.getElementById('admin-change-role-btn').addEventListener('click', async function () {
-        if (!selectedAdminUser) return;
-        const newRole = document.getElementById('admin-role-checkbox').checked ? 'admin' : 'user';
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch(`/users/${encodeURIComponent(selectedAdminUser.name)}/role`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: newRole })
-          });
-          const result = await resp.json();
-          if (!resp.ok) throw new Error(result.detail || 'Ошибка');
-          showNotification('Роль успешно обновлена', 'success');
-          // Обновим список пользователей
-          const userList = await loadUsersForAdmin();
-          allUsers = userList;
-          renderAdminSearchResults(document.getElementById('admin-search-input').value);
-          const updated = allUsers.find(u => u.name === selectedAdminUser.name);
-          if (updated) {
-            selectedAdminUser = updated;
-            document.getElementById('admin-selected-name').textContent = updated.name;
-            document.getElementById('admin-role-checkbox').checked = (updated.role === 'admin');
-          }
-        } catch (e) {
-          document.getElementById('admin-user-message').textContent = e.message;
-          document.getElementById('admin-user-message').style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      document.getElementById('admin-role-checkbox').addEventListener('change', function () {
-        const label = document.getElementById('admin-role-label');
-        if (this.checked) {
-          label.textContent = '👑 Администратор';
-        } else {
-          label.textContent = '👤 Пользователь';
-        }
-      });
-
-      // Удаление пользователя
-      document.getElementById('admin-delete-user-btn').addEventListener('click', async function () {
-        if (!selectedAdminUser) return;
-        if (!confirm(`Удалить пользователя "${selectedAdminUser.name}"?`)) return;
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch(`/users/${encodeURIComponent(selectedAdminUser.name)}`, {
-            method: 'DELETE'
-          });
-          const result = await resp.json();
-          if (!resp.ok) throw new Error(result.detail || 'Ошибка');
-          showNotification('Пользователь удалён', 'success');
-          // Обновим список
-          const userList = await loadUsersForAdmin();
-          allUsers = userList;
-          selectedAdminUser = null;
-          document.getElementById('admin-selected-user').style.display = 'none';
-          renderAdminSearchResults(document.getElementById('admin-search-input').value);
-        } catch (e) {
-          document.getElementById('admin-user-message').textContent = e.message;
-          document.getElementById('admin-user-message').style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      // Создание пользователя
-      document.getElementById('admin-create-user-btn').addEventListener('click', async function () {
-        const name = document.getElementById('admin-create-name').value.trim();
-        const pin = document.getElementById('admin-create-pin').value.trim();
-        if (!name || !pin) {
-          document.getElementById('admin-create-error').textContent = 'Введите имя и PIN';
-          document.getElementById('admin-create-error').style.display = 'block';
-          return;
-        }
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch('/users/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, pin: pin })
-          });
-          const result = await resp.json();
-          if (!resp.ok) throw new Error(result.detail || 'Ошибка');
-          showNotification('Пользователь создан', 'success');
-          // Скрываем блок создания
-          document.getElementById('admin-create-block').style.display = 'none';
-          const addChip = document.getElementById('add-user-chip');
-          if (addChip) addChip.style.display = 'inline-block';
-          document.getElementById('admin-create-name').value = '';
-          document.getElementById('admin-create-pin').value = '';
-          document.getElementById('admin-create-error').style.display = 'none';
-          // Обновляем список пользователей
-          const userList = await loadUsersForAdmin();
-          allUsers = userList;
-          renderAdminSearchResults(document.getElementById('admin-search-input').value);
-        } catch (e) {
-          document.getElementById('admin-create-error').textContent = e.message;
-          document.getElementById('admin-create-error').style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      // Кнопка синхронизации в панели
-      document.getElementById('admin-sync-btn').addEventListener('click', async function () {
-        if (!isAdmin) return;
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch('/sync/run', {
-            method: 'POST'
-          });
-          const data = await resp.json();
-          if (!resp.ok) throw new Error(data.detail || 'Ошибка');
-          showNotification('Синхронизация запущена успешно!', 'success');
-        } catch (e) {
-          showNotification('Ошибка: ' + e.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      // ---------- Добавление новой даты (админ) ----------
-      function openAddDateModal() {
-        if (!isAdmin) return;
-        const input = document.getElementById('add-date-input');
-        const now = new Date();
-        const dd = String(now.getDate()).padStart(2, '0');
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        input.value = `${dd}.${mm}.${now.getFullYear()}`;
-        const errEl = document.getElementById('add-date-error');
-        errEl.textContent = '';
-        errEl.style.display = 'none';
-        document.getElementById('add-date-modal').style.display = 'flex';
-        input.focus();
-      }
-
-      function closeAddDateModal() {
-        document.getElementById('add-date-modal').style.display = 'none';
-      }
-
-      document.getElementById('add-date-btn').addEventListener('click', openAddDateModal);
-      document.getElementById('add-date-close').addEventListener('click', closeAddDateModal);
-      document.getElementById('add-date-cancel').addEventListener('click', closeAddDateModal);
-
-      document.getElementById('add-date-confirm').addEventListener('click', async function () {
-        const input = document.getElementById('add-date-input');
-        const errEl = document.getElementById('add-date-error');
-        const dateStr = input.value.trim().replace(/\s+/g, ' ');
-
-        if (!/^\d{2}\.\d{2}\.\d{4}(\s*\([^<>"'`&/\\#?]+\))?$/.test(dateStr)) {
-          errEl.textContent = 'Формат: ДД.ММ.ГГГГ (пояснение в скобках). В пояснении нельзя символы < > " \' & / # ?';
-          errEl.style.display = 'block';
-          return;
-        }
-
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch('/duty/dates', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date_str: dateStr })
-          });
-          const data = await resp.json();
-          if (!resp.ok) throw new Error(data.detail || 'Ошибка добавления даты');
-          closeAddDateModal();
-          await refreshDutyData();
-          await refreshRepertoire();
-          showNotification('Дата добавлена', 'success');
-        } catch (e) {
-          errEl.textContent = e.message;
-          errEl.style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      document.getElementById('manage-songs-btn').addEventListener('click', showSongsModal);
-
-      // ---------- Вкладки ----------
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-          this.classList.add('active');
-          const tabName = this.dataset.tab;
-          document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
-          document.getElementById('tab-' + tabName).style.display = 'block';
-        });
-      });
-
-      // ---------- Парсер даты ----------
-      function parseDateDDMMYYYY(str) {
-        if (!str) return null;
-        const parts = str.split('.');
-        if (parts.length !== 3) return null;
-        const d = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10) - 1;
-        const y = parseInt(parts[2], 10);
-        if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
-        return new Date(y, m, d);
-      }
-
-      function formatDateDisplay(dateStr) {
-        return dateStr;
-      }
-
-      // ---------- Управление песнями (новые эндпоинты) ----------
-      async function loadSongs() {
-        const resp = await fetch(API_URL + '/songs/');
-        if (!resp.ok) throw new Error('Ошибка загрузки песен');
-        return await resp.json();
-      }
-
-      async function addNewSong(name, text) {
-        const resp = await apiFetch('/songs/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, text })
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || 'Ошибка добавления песни');
-        return true;
-      }
-
-      async function updateSongTextOnServer(name, newText) {
-        // Текст песни едет в теле запроса: в query он упирался в лимит длины URL.
-        const resp = await apiFetch(`/songs/${encodeURIComponent(name)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: newText })
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || 'Ошибка обновления текста');
-        return true;
-      }
-
-      async function deleteSongOnServer(name) {
-        const resp = await apiFetch(`/songs/${encodeURIComponent(name)}`, {
-          method: 'DELETE'
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || 'Ошибка удаления песни');
-        return true;
-      }
-
-      async function setRepertoireSongs(date, songItems) {
-        // Преобразуем в массив строк и убираем дубликаты
-        const songNames = songItems
-          .map(item => typeof item === 'string' ? item : item.name)
-          .filter((name, index, self) => self.indexOf(name) === index);
-
-        const resp = await apiFetch(`/repertoire/${encodeURIComponent(date)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ songs: songNames })
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || 'Ошибка обновления репертуара');
-        return true;
-      }
-
-      // ---------- Модальное окно управления песнями ----------
-      let currentRepertoireDate = '';
-
-      async function showSongsModal() {
-        if (!isAdmin) return;
-        const modal = document.getElementById('songs-modal');
-        showGlobalLoader();
-        let songs = [];
-        try {
-          songs = await loadSongs();
-        } catch (e) {
-          showNotification('Ошибка загрузки песен: ' + e.message, 'error');
-          hideGlobalLoader();
-          return;
-        } finally {
-          hideGlobalLoader();
-        }
-        allSongs = songs;
-        filteredSongs = allSongs;
-        songsCurrentPage = 0;
-        renderSongsList();
-        modal.style.display = 'flex';
-      }
-
-      function renderSongsList() {
-        const container = document.getElementById('songs-list-container');
-        const paginationEl = document.getElementById('songs-pagination');
-        const filter = document.getElementById('songs-filter-input').value.toLowerCase().trim();
-        filteredSongs = allSongs.filter(s => s.name.toLowerCase().includes(filter));
-        const totalPages = Math.ceil(filteredSongs.length / SONGS_PAGE_SIZE) || 1;
-        if (songsCurrentPage >= totalPages) songsCurrentPage = totalPages - 1;
-        if (songsCurrentPage < 0) songsCurrentPage = 0;
-        const start = songsCurrentPage * SONGS_PAGE_SIZE;
-        const end = Math.min(start + SONGS_PAGE_SIZE, filteredSongs.length);
-        const pageItems = filteredSongs.slice(start, end);
-
-        container.innerHTML = '';
-        if (pageItems.length === 0) {
-          container.innerHTML = '<p style="color:var(--text-muted);">Нет песен, удовлетворяющих фильтру.</p>';
-        } else {
-          pageItems.forEach(song => {
-            const div = document.createElement('div');
-            div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 4px; border-bottom:1px solid var(--border-color);';
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = song.name;
-            nameSpan.style.cssText = 'font-weight:500; font-size:1rem;';
-            const actionsDiv = document.createElement('div');
-            actionsDiv.style.cssText = 'display:flex; gap:8px;';
-            const editBtn = document.createElement('button');
-            editBtn.textContent = '✏️';
-            editBtn.style.cssText = 'padding:4px 8px; border:none; border-radius:4px; background:#4f46e5; color:#fff; cursor:pointer;';
-            editBtn.title = 'Редактировать текст песни';
-            editBtn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              openEditSongModal(song.name);
-            });
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = '🗑️';
-            deleteBtn.style.cssText = 'padding:4px 8px; border:none; border-radius:4px; background:#ef4444; color:#fff; cursor:pointer;';
-            deleteBtn.title = 'Удалить песню';
-            deleteBtn.addEventListener('click', async (e) => {
-              e.stopPropagation();
-              if (!confirm('Удалить песню "' + song.name + '"?')) return;
-              try {
-                showGlobalLoader();
-                await deleteSongOnServer(song.name);
-                showNotification('Песня удалена', 'success');
-                await showSongsModal();
-              } catch (e) {
-                showNotification('Ошибка: ' + e.message, 'error');
-              } finally {
-                hideGlobalLoader();
-              }
-            });
-            actionsDiv.appendChild(editBtn);
-            actionsDiv.appendChild(deleteBtn);
-            div.appendChild(nameSpan);
-            div.appendChild(actionsDiv);
-            container.appendChild(div);
-          });
-        }
-
-        paginationEl.innerHTML = `
-          <button class="prev" ${songsCurrentPage === 0 ? 'disabled' : ''}>← Назад</button>
-          <span>${songsCurrentPage + 1} / ${totalPages}</span>
-          <button class="next" ${songsCurrentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
-        `;
-        paginationEl.querySelector('.prev').addEventListener('click', () => {
-          if (songsCurrentPage > 0) { songsCurrentPage--; renderSongsList(); }
-        });
-        paginationEl.querySelector('.next').addEventListener('click', () => {
-          if (songsCurrentPage < totalPages - 1) { songsCurrentPage++; renderSongsList(); }
-        });
-      }
-
-      document.getElementById('songs-filter-input').addEventListener('input', function () {
-        songsCurrentPage = 0;
-        renderSongsList();
-      });
-
-      document.getElementById('open-add-song-btn').addEventListener('click', openAddSongModal);
-
-      // ---------- Модальное окно добавления песни ----------
-      function openAddSongModal() {
-        const modal = document.getElementById('add-song-modal');
-        document.getElementById('add-song-name-input').value = '';
-        document.getElementById('add-song-text-input').value = '';
-        document.getElementById('add-song-modal-error').style.display = 'none';
-        modal.style.display = 'flex';
-        document.getElementById('add-song-name-input').focus();
-      }
-
-      document.getElementById('add-song-modal-close').addEventListener('click', () => {
-        closeModal(document.getElementById('add-song-modal'));
-      });
-      document.getElementById('add-song-modal-cancel').addEventListener('click', () => {
-        closeModal(document.getElementById('add-song-modal'));
-      });
-
-      document.getElementById('add-song-modal-save').addEventListener('click', async () => {
-        const nameInput = document.getElementById('add-song-name-input');
-        const textInput = document.getElementById('add-song-text-input');
-        const error = document.getElementById('add-song-modal-error');
-        const name = nameInput.value.trim();
-        const text = textInput.value.trim();
-        if (!name) {
-          error.textContent = 'Введите название песни';
-          error.style.display = 'block';
-          return;
-        }
-        error.style.display = 'none';
-        try {
-          showGlobalLoader();
-          await addNewSong(name, text);
-          showNotification('Песня добавлена', 'success');
-          closeModal(document.getElementById('add-song-modal'));
-          await showSongsModal();
-        } catch (e) {
-          error.textContent = e.message;
-          error.style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      // ---------- Модальное окно редактирования песни ----------
-      function openEditSongModal(songName) {
-        const modal = document.getElementById('edit-song-modal');
-        const nameDisplay = document.getElementById('edit-song-name-display');
-        const textarea = document.getElementById('edit-song-textarea');
-        const error = document.getElementById('edit-song-error');
-        error.style.display = 'none';
-
-        const song = allSongs.find(s => s.name === songName);
-        if (!song) {
-          showNotification('Песня не найдена', 'warning');
-          return;
-        }
-        currentEditSongName = songName;
-        nameDisplay.textContent = songName;
-        textarea.value = song.text || '';
-        modal.style.display = 'flex';
-        textarea.focus();
-      }
-
-      document.getElementById('edit-song-close-btn').addEventListener('click', () => {
-        closeModal(document.getElementById('edit-song-modal'));
-      });
-      document.getElementById('edit-song-cancel').addEventListener('click', () => {
-        closeModal(document.getElementById('edit-song-modal'));
-      });
-
-      document.getElementById('edit-song-save').addEventListener('click', async () => {
-        const textarea = document.getElementById('edit-song-textarea');
-        const error = document.getElementById('edit-song-error');
-        const newText = textarea.value;
-        try {
-          showGlobalLoader();
-          await updateSongTextOnServer(currentEditSongName, newText);
-          showNotification('Текст песни обновлён', 'success');
-          closeModal(document.getElementById('edit-song-modal'));
-          await showSongsModal();
-        } catch (e) {
-          error.textContent = 'Ошибка сохранения: ' + e.message;
-          error.style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      // ---------- Модалка добавления песни в репертуар ----------
-      let repertoireSuggestionIndex = -1;
-
-      function getRepertoireSuggestionsEl() {
-        return document.getElementById('repertoire-song-suggestions');
-      }
-
-      function hideRepertoireSuggestions() {
-        const container = getRepertoireSuggestionsEl();
-        if (!container) return;
-        container.classList.remove('visible');
-        container.innerHTML = '';
-        repertoireSuggestionIndex = -1;
-      }
-
-      function renderRepertoireSuggestions() {
-        const input = document.getElementById('repertoire-song-input');
-        const container = getRepertoireSuggestionsEl();
-        if (!input || !container) return;
-
-        const query = input.value.trim().toLowerCase();
-        const matches = allSongs
-          .filter(song => !query || song.name.toLowerCase().includes(query))
-          .slice(0, 30);
-
-        repertoireSuggestionIndex = -1;
-        container.innerHTML = '';
-
-        if (!allSongs.length) {
-          hideRepertoireSuggestions();
-          return;
-        }
-
-        if (matches.length === 0) {
-          const empty = document.createElement('div');
-          empty.className = 'song-suggestion-empty';
-          empty.textContent = 'Ничего не найдено';
-          container.appendChild(empty);
-        } else {
-          matches.forEach(song => {
-            const item = document.createElement('div');
-            item.className = 'song-suggestion';
-            item.setAttribute('role', 'option');
-            item.textContent = song.name;
-            item.addEventListener('click', () => selectRepertoireSuggestion(song.name));
-            container.appendChild(item);
-          });
-        }
-        container.classList.add('visible');
-      }
-
-      function selectRepertoireSuggestion(songName) {
-        const input = document.getElementById('repertoire-song-input');
-        if (!input) return;
-        input.value = songName;
-        hideRepertoireSuggestions();
-        // На мобильных убираем клавиатуру после выбора
-        input.blur();
-      }
-
-      function highlightRepertoireSuggestion(delta) {
-        const container = getRepertoireSuggestionsEl();
-        const items = container ? container.querySelectorAll('.song-suggestion') : [];
-        if (!items.length) return;
-        repertoireSuggestionIndex += delta;
-        if (repertoireSuggestionIndex < 0) repertoireSuggestionIndex = items.length - 1;
-        if (repertoireSuggestionIndex >= items.length) repertoireSuggestionIndex = 0;
-        items.forEach((item, index) => {
-          item.classList.toggle('active', index === repertoireSuggestionIndex);
-        });
-        const active = items[repertoireSuggestionIndex];
-        if (active && active.scrollIntoView) {
-          active.scrollIntoView({ block: 'nearest' });
-        }
-      }
-
-      function openAddRepertoireSongModal(date) {
-        currentRepertoireDate = date;
-        const modal = document.getElementById('add-repertoire-song-modal');
-        const input = document.getElementById('repertoire-song-input');
-        const error = document.getElementById('add-repertoire-song-error');
-        error.style.display = 'none';
-        input.value = '';
-        hideRepertoireSuggestions();
-
-        // Загружаем список песен, если пусто
-        if (!allSongs.length) {
-          loadSongs().then(songs => {
-            allSongs = songs;
-            renderRepertoireSuggestions();
-          }).catch(e => showNotification('Ошибка загрузки песен: ' + e.message, 'error'));
-        }
-
-        modal.style.display = 'flex';
-        input.focus();
-        if (allSongs.length) renderRepertoireSuggestions();
-      }
-
-      // Автодополнение работает и на мобильных: свой список вместо <datalist>,
-      // который на телефонах не раскрывает подсказки.
-      const repertoireSongInput = document.getElementById('repertoire-song-input');
-      const repertoireSuggestionsEl = document.getElementById('repertoire-song-suggestions');
-
-      repertoireSongInput.addEventListener('input', renderRepertoireSuggestions);
-      repertoireSongInput.addEventListener('focus', function () {
-        if (allSongs.length) renderRepertoireSuggestions();
-      });
-      repertoireSongInput.addEventListener('keydown', function (e) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          highlightRepertoireSuggestion(1);
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          highlightRepertoireSuggestion(-1);
-        } else if (e.key === 'Escape') {
-          hideRepertoireSuggestions();
-        } else if (e.key === 'Enter') {
-          const items = repertoireSuggestionsEl.querySelectorAll('.song-suggestion');
-          if (repertoireSuggestionIndex >= 0 && items[repertoireSuggestionIndex]) {
-            e.preventDefault();
-            selectRepertoireSuggestion(items[repertoireSuggestionIndex].textContent);
-          }
-        }
-      });
-
-      // Тап/клик вне поля и списка закрывает подсказки
-      document.addEventListener('pointerdown', function (e) {
-        const modal = document.getElementById('add-repertoire-song-modal');
-        if (!modal || modal.style.display === 'none') return;
-        if (e.target instanceof Element && !e.target.closest('.song-suggest-wrap')) {
-          hideRepertoireSuggestions();
-        }
-      });
-
-      document.getElementById('add-repertoire-song-confirm').addEventListener('click', async () => {
-        const input = document.getElementById('repertoire-song-input');
-        const songName = input.value.trim();
-        const error = document.getElementById('add-repertoire-song-error');
-        error.style.display = 'none';
-
-        if (!songName) {
-          error.textContent = 'Введите название песни';
-          error.style.display = 'block';
-          return;
-        }
-
-        // Проверяем, существует ли песня с таким именем (регистронезависимо)
-        const songExists = allSongs.some(s => s.name.toLowerCase() === songName.toLowerCase());
-        if (!songExists) {
-          error.textContent = 'Песня не найдена. Проверьте написание.';
-          error.style.display = 'block';
-          return;
-        }
-
-        try {
-          showGlobalLoader();
-          const entry = repertoireData[currentRepertoireDate];
-          const currentSongs = entry ? entry.songs || [] : [];
-          const currentSongNames = currentSongs.map(s => typeof s === 'string' ? s : s.name);
-
-          // Проверяем дубликат
-          if (currentSongNames.some(name => name.toLowerCase() === songName.toLowerCase())) {
-            showNotification('Эта песня уже есть в репертуаре на эту дату', 'warning');
-            hideGlobalLoader();
-            return;
-          }
-
-          const newSongs = [...currentSongNames, songName];
-          await setRepertoireSongs(currentRepertoireDate, newSongs);
-          await refreshRepertoire();
-          document.getElementById('add-repertoire-song-modal').style.display = 'none';
-          showNotification('Песня добавлена', 'success');
-        } catch (e) {
-          showNotification('Ошибка: ' + e.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      document.getElementById('add-repertoire-song-cancel').addEventListener('click', () => {
-        document.getElementById('add-repertoire-song-modal').style.display = 'none';
-      });
-
-      // ---------- Обновление репертуара ----------
-      async function refreshRepertoire() {
-        const resp = await fetch(API_URL + '/repertoire/');
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error);
-        Object.keys(data).forEach(dateStr => {
-          const entry = data[dateStr];
-          if (Array.isArray(entry.songs) && entry.songs.length > 0 && typeof entry.songs[0] === 'string') {
-            entry.songs = entry.songs.map(name => ({ name, text: '' }));
-          }
-        });
-        repertoireData = data;
-        renderMainCards();
-        renderArchiveTable();
-        if (isEditDateModalOpen()) renderEditDateRepertoire();
-      }
-
-      // ---------- Загрузка данных ----------
-      async function loadData() {
-        const loading = document.getElementById('loading');
-        const mainSection = document.getElementById('main-section');
-        const archiveSection = document.getElementById('archive-section');
-        const statsSection = document.getElementById('stats-section');
-
-        showGlobalLoader();
-        try {
-          // Загрузка матрицы дежурств
-          const resp = await fetch(API_URL + '/duty/matrix');
-          if (!resp.ok) throw new Error('Ошибка загрузки графика');
-          const data = await resp.json();
-          const { dates, names, matrix } = data;
-          if (!dates || !names || !matrix) throw new Error('Некорректные данные');
-
-          allDates = dates.map((dateStr, i) => ({
-            dateStr: dateStr,
-            names: names,
-            matrixRow: matrix[i] || []
-          }));
-
-          // Загрузка репертуара
-          const repResp = await fetch(API_URL + '/repertoire/');
-          if (!repResp.ok) throw new Error('Ошибка загрузки репертуара');
-          const repData = await repResp.json();
-          Object.keys(repData).forEach(dateStr => {
-            const entry = repData[dateStr];
-            if (Array.isArray(entry.songs) && entry.songs.length > 0 && typeof entry.songs[0] === 'string') {
-              entry.songs = entry.songs.map(name => ({ name, text: '' }));
-            }
-          });
-          repertoireData = repData;
-
-          try {
-            const songsResp = await fetch(API_URL + '/songs/');
-            if (songsResp.ok) {
-              allSongs = await songsResp.json();
-            }
-          } catch (e) {
-            console.warn('Не удалось загрузить песни', e);
-          }
-
-          await autoLogin();
-
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          futureDates = [];
-          pastDates = [];
-
-          allDates.forEach(item => {
-            const d = parseDateDDMMYYYY(item.dateStr);
-            if (!d) {
-              futureDates.push(item);
-              return;
-            }
-            d.setHours(0, 0, 0, 0);
-            if (d < today) pastDates.push(item);
-            else futureDates.push(item);
-          });
-
-          futureDates.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
-          pastDates.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
-
-          loading.style.display = 'none';
-          mainSection.style.display = 'block';
-          archiveSection.style.display = 'block';
-          statsSection.style.display = 'block';
-
-          renderMainCards();
-          renderArchiveTable();
-          renderStats();
-          updateCounts();
-
-        } catch (e) {
-          loading.innerHTML = `<div style="color:#ef4444; padding:20px;">❌ ${escapeHtml(e.message)}</div>`;
-          console.error(e);
-        } finally {
-          hideGlobalLoader();
-        }
-      }
-
-      // ---------- Рендер основной таблицы ----------
-      function withRepertoire(item) {
-        const entry = repertoireData[item.dateStr] || {};
-        return Object.assign({}, item, {
-          songs: entry.songs || [],
-          colors: entry.colors || []
-        });
-      }
-
-      function renderMainCards() {
-        const container = document.getElementById('main-table-container');
-        const paginationEl = document.getElementById('main-pagination');
-
-        if (futureDates.length === 0) {
-          container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Нет предстоящих дежурств.</p>';
-          paginationEl.innerHTML = '';
-          return;
-        }
-
-        const totalPages = Math.ceil(futureDates.length / PAGE_SIZE);
-        if (currentPage >= totalPages) currentPage = totalPages - 1;
-        if (currentPage < 0) currentPage = 0;
-
-        const start = currentPage * PAGE_SIZE;
-        const end = Math.min(start + PAGE_SIZE, futureDates.length);
-        const pageItems = futureDates.slice(start, end).map(withRepertoire);
-
-        container.innerHTML = buildCardsHTML(pageItems, false);
-        attachCardEvents();
-
-        paginationEl.innerHTML = `
-    <button class="prev" ${currentPage === 0 ? 'disabled' : ''}>← Назад</button>
-    <span>${currentPage + 1} / ${totalPages}</span>
-    <button class="next" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Вперёд →</button>
-  `;
-        paginationEl.querySelector('.prev').addEventListener('click', () => {
-          if (currentPage > 0) { currentPage--; renderMainCards(); }
-        });
-        paginationEl.querySelector('.next').addEventListener('click', () => {
-          if (currentPage < totalPages - 1) { currentPage++; renderMainCards(); }
-        });
-      }
-
-      function buildCardsHTML(items, isArchive = false) {
-        if (!items || items.length === 0) return '';
-        const names = items[0].names;
-        let html = '<div class="duty-grid">';
-
-        items.forEach(item => {
-          const dateStr = item.dateStr;
-          const row = item.matrixRow;
-          const checkedCount = row.filter(v => v === true).length;
-          const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
-          const fillClass = checkedCount === MAX_PER_DAY ? 'full' : '';
-
-          // Получаем имена только назначенных дежурных
-          const assignedNames = names.filter((name, idx) => row[idx] === true);
-
-          html += `
-      <div class="duty-card" data-date="${escapeHtml(dateStr)}">
-        <div class="duty-card-header">
-          <span class="duty-date" title="${escapeHtml(formatDateDisplay(dateStr))}">${escapeHtml(formatDateDisplay(dateStr))}</span>
-          <span class="duty-card-header-right">
-            <span class="duty-count">${checkedCount}/${MAX_PER_DAY}</span>
-            ${isAdmin ? `<button class="btn-edit-date" data-date="${escapeHtml(dateStr)}" title="Редактировать дату" aria-label="Редактировать дату">✏️</button>` : ''}
-          </span>
-        </div>
-        <div class="duty-card-body">
-          <div class="duty-progress">
-            <div class="progress-bar">
-              <div class="progress-fill ${fillClass}" style="width:${percent}%;"></div>
-            </div>
-          </div>
-          <div class="duty-users">
-            ${!isArchive ? getActionHTML(dateStr, row, names) : ''}
-            ${assignedNames.map(name => {
-            const isOwn = currentUser && name === currentUser;
-            let cls = 'duty-user selected';
-            if (isArchive) cls += ' disabled';
-            if (isAdmin) cls += ' read-only';
-            else if (!isOwn) cls += ' disabled';
-            return `<span class="${cls}" data-date="${escapeHtml(dateStr)}" data-name="${escapeHtml(name)}" data-checked="true">${escapeHtml(name)} ✔</span>`;
-          }).join('')}
-          </div>
-          ${buildRepertoireSectionHTML([{ dateStr, songs: item.songs || [], colors: item.colors || [] }], isArchive)}
-        </div>
-      </div>
-    `;
-        });
-
-        html += '</div>';
-        return html;
-      }
-
-      function getActionHTML(dateStr, row, names) {
-        const checkedCount = row.filter(v => v === true).length;
-        const currentUserIndex = names.indexOf(currentUser);
-        const isUserSelected = currentUserIndex !== -1 && row[currentUserIndex] === true;
-
-        // Администратор назначает дежурных через модальное окно редактирования даты.
-        if (isAdmin) return '';
-
-        if (currentUser) {
-          if (isUserSelected) {
-            return `<button class="btn-take-duty" data-date="${escapeHtml(dateStr)}" data-action="remove">❌ Отказаться</button>`;
-          } else if (checkedCount < MAX_PER_DAY) {
-            return `<button class="btn-take-duty" data-date="${escapeHtml(dateStr)}" data-action="add">✅ Занять</button>`;
-          } else {
-            return `<span class="duty-users-note">⚠️ Мест нет</span>`;
-          }
-        }
-
-        return '';
-      }
-
-      function attachCardEvents() {
-        // Обычный пользователь может снять только собственное дежурство.
-        // У администратора выбор дежурных перенесён в модальное окно.
-        document.querySelectorAll('.duty-user:not(.disabled):not(.read-only)').forEach(el => {
-          el.removeEventListener('click', toggleCell);
-          el.addEventListener('click', toggleCell);
-        });
-
-        // Обработка кнопки "Занять" / "Отказаться"
-        document.querySelectorAll('.btn-take-duty').forEach(btn => {
-          btn.removeEventListener('click', handleTakeDuty);
-          btn.addEventListener('click', handleTakeDuty);
-        });
-
-        // Редактирование даты (только админ)
-        document.querySelectorAll('.btn-edit-date').forEach(btn => {
-          btn.removeEventListener('click', handleEditDate);
-          btn.addEventListener('click', handleEditDate);
-        });
-
-        // Сворачивание/раскрытие песен в карточке
-        document.querySelectorAll('.repertoire-toggle').forEach(btn => {
-          btn.removeEventListener('click', handleRepertoireToggle);
-          btn.addEventListener('click', handleRepertoireToggle);
-        });
-
-        // Просмотр текста песни
-        document.querySelectorAll('.card-repertoire .song-name.has-text').forEach(el => {
-          el.removeEventListener('click', openViewSongModalHandler);
-          el.addEventListener('click', openViewSongModalHandler);
-        });
-
-        // Управление песнями в карточках (только админ).
-        // Именно в карточках: такие же кнопки есть в модалке редактирования даты,
-        // и у них свои обработчики.
-        document.querySelectorAll('.card-repertoire .delete-repertoire-song-btn').forEach(btn => {
-          btn.removeEventListener('click', deleteRepertoireSongHandler);
-          btn.addEventListener('click', deleteRepertoireSongHandler);
-        });
-        document.querySelectorAll('.card-repertoire .move-song-up-btn').forEach(btn => {
-          btn.removeEventListener('click', moveSongUpHandler);
-          btn.addEventListener('click', moveSongUpHandler);
-        });
-        document.querySelectorAll('.card-repertoire .move-song-down-btn').forEach(btn => {
-          btn.removeEventListener('click', moveSongDownHandler);
-          btn.addEventListener('click', moveSongDownHandler);
-        });
-        document.querySelectorAll('.card-repertoire .add-song-to-date-btn').forEach(btn => {
-          btn.removeEventListener('click', addSongToDateHandler);
-          btn.addEventListener('click', addSongToDateHandler);
-        });
-
-        applyRepertoireExpansionState();
-      }
-
-      function handleRepertoireToggle(e) {
-        e.preventDefault();
-        const btn = e.currentTarget;
-        const block = btn.closest('.card-repertoire');
-        if (!block) return;
-        const dateStr = btn.dataset.date;
-        const isOpen = block.classList.toggle('open');
-        btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        if (isOpen) expandedRepertoireDates.add(dateStr);
-        else expandedRepertoireDates.delete(dateStr);
-        syncDutyCardExpanded(block.closest('.duty-card'));
-      }
-
-      function syncDutyCardExpanded(card) {
-        if (!card) return;
-        card.classList.toggle('expanded', !!card.querySelector('.card-repertoire.open'));
-      }
-
-      function applyRepertoireExpansionState() {
-        document.querySelectorAll('.card-repertoire').forEach(block => {
-          const dateStr = block.dataset.date;
-          const isOpen = expandedRepertoireDates.has(dateStr);
-          block.classList.toggle('open', isOpen);
-          const btn = block.querySelector('.repertoire-toggle');
-          if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-          syncDutyCardExpanded(block.closest('.duty-card'));
-        });
-      }
-
-      function handleEditDate(e) {
-        e.stopPropagation();
-        const btn = e.currentTarget;
-        const card = btn.closest('.duty-card');
-        const dateStr = btn.dataset.date || (card ? card.dataset.date : null);
-        if (!dateStr) return;
-        openEditDateModal(dateStr);
-      }
-
-      async function deleteDate(dateStr) {
-        if (!dateStr) return;
-
-        const entry = allDates.find(d => d.dateStr === dateStr);
-        const assignedCount = entry ? entry.matrixRow.filter(v => v === true).length : 0;
-
-        let confirmText = `Удалить дату «${dateStr}»?\n\n`;
-        if (assignedCount > 0) {
-          confirmText += `Вместе с датой удалятся дежурные (${assignedCount}) и весь репертуар на неё.\n\n`;
-        }
-        confirmText += 'Действие необратимо.';
-        if (!confirm(confirmText)) return;
-
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch(
-            `/duty/dates/${encodeURIComponent(dateStr)}`,
-            { method: 'DELETE' }
-          );
-          const data = await resp.json().catch(() => ({}));
-          if (!resp.ok) throw new Error(data.detail || 'Не удалось удалить дату');
-
-          closeEditDateModal();
-          await refreshDutyData();
-          await refreshRepertoire();
-          showNotification('Дата удалена', 'success');
-        } catch (err) {
-          showNotification('Ошибка: ' + err.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      }
-
-      // ---------- Модальное окно редактирования даты ----------
-      let currentEditDate = '';
-      let editSelectedDutyIndices = [];
-
-      function isEditDateModalOpen() {
-        const modal = document.getElementById('edit-date-modal');
-        return !!modal && modal.style.display === 'flex';
-      }
-
-      function openEditDateModal(dateStr) {
-        if (!isAdmin) return;
-        const modal = document.getElementById('edit-date-modal');
-        const input = document.getElementById('edit-date-input');
-        const title = document.getElementById('edit-date-title');
-        const error = document.getElementById('edit-date-error');
-        const dutyError = document.getElementById('edit-date-duty-error');
-        currentEditDate = dateStr;
-        input.value = dateStr;
-        title.textContent = dateStr;
-        error.textContent = '';
-        error.style.display = 'none';
-        dutyError.textContent = '';
-        dutyError.style.display = 'none';
-        document.getElementById('edit-date-max').textContent = MAX_PER_DAY;
-        renderEditDateDutyList();
-        renderEditDateRepertoire();
-        modal.style.display = 'flex';
-      }
-
-      function closeEditDateModal() {
-        const modal = document.getElementById('edit-date-modal');
-        if (modal) modal.style.display = 'none';
-        currentEditDate = '';
-        editSelectedDutyIndices = [];
-      }
-
-      function renderEditDateDutyList() {
-        const list = document.getElementById('edit-date-duty-list');
-        if (!list || !currentEditDate) return;
-        const entry = allDates.find(d => d.dateStr === currentEditDate);
-        list.innerHTML = '';
-        editSelectedDutyIndices = [];
-        if (!entry || !entry.names.length) {
-          list.innerHTML = '<span class="edit-date-empty">Нет пользователей</span>';
-          return;
-        }
-
-        editSelectedDutyIndices = entry.matrixRow
-          .map((value, index) => value ? index : -1)
-          .filter(index => index >= 0);
-
-        entry.names.forEach((name, index) => {
-          const item = document.createElement('span');
-          item.className = 'duty-select-item' + (editSelectedDutyIndices.includes(index) ? ' selected' : '');
-          item.textContent = name;
-          item.dataset.idx = index;
-          item.addEventListener('click', function () {
-            const idx = parseInt(this.dataset.idx, 10);
-            const selectedIdx = editSelectedDutyIndices.indexOf(idx);
-            if (selectedIdx >= 0) {
-              editSelectedDutyIndices.splice(selectedIdx, 1);
-              this.classList.remove('selected');
-              return;
-            }
-            if (editSelectedDutyIndices.length >= MAX_PER_DAY) {
-              showNotification(`Можно выбрать не более ${MAX_PER_DAY} дежурных`, 'warning');
-              return;
-            }
-            editSelectedDutyIndices.push(idx);
-            this.classList.add('selected');
-          });
-          list.appendChild(item);
-        });
-      }
-
-      function renderEditDateRepertoire() {
-        const container = document.getElementById('edit-date-repertoire');
-        if (!container || !currentEditDate) return;
-        container.innerHTML = '';
-        const entry = repertoireData[currentEditDate];
-        const songs = entry && Array.isArray(entry.songs) ? entry.songs : [];
-
-        if (!songs.length) {
-          container.innerHTML = '<div class="edit-date-empty">Песен пока нет</div>';
-          return;
-        }
-
-        songs.forEach((song, index) => {
-          const songName = typeof song === 'string' ? song : song.name;
-          const songText = typeof song === 'string' ? '' : song.text;
-          const item = document.createElement('div');
-          item.className = 'repertoire-song-item edit-date-song-item';
-
-          const name = document.createElement('span');
-          name.className = 'song-name' + (songText ? ' has-text' : '');
-          name.textContent = '• ' + songName;
-          name.dataset.song = songName;
-          if (songText) name.addEventListener('click', openViewSongModalHandler);
-          item.appendChild(name);
-
-          const actions = document.createElement('div');
-          actions.className = 'song-actions';
-
-          const makeButton = (label, title, className, handler, disabled) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = label;
-            button.title = title;
-            button.className = className;
-            button.dataset.date = currentEditDate;
-            button.dataset.song = songName;
-            button.disabled = !!disabled;
-            button.addEventListener('click', handler);
-            actions.appendChild(button);
-          };
-
-          makeButton('↑', 'Переместить вверх', 'move-song-up-btn', moveSongUpHandler, index === 0);
-          makeButton('↓', 'Переместить вниз', 'move-song-down-btn', moveSongDownHandler, index === songs.length - 1);
-          makeButton('✖', 'Удалить песню', 'delete-repertoire-song-btn', deleteRepertoireSongHandler, false);
-
-          item.appendChild(actions);
-          container.appendChild(item);
-        });
-      }
-
-      async function saveEditDateRename() {
-        const input = document.getElementById('edit-date-input');
-        const error = document.getElementById('edit-date-error');
-        const newDate = input.value.trim().replace(/\s+/g, ' ');
-        error.textContent = '';
-        error.style.display = 'none';
-
-        const dateRe = /^\d{2}\.\d{2}\.\d{4}(\s*\([^<>"'`&\/#?]+\))?$/;
-        if (!dateRe.test(newDate)) {
-          error.textContent = 'Формат даты: ДД.ММ.ГГГГ (пояснение в скобках). В пояснении нельзя символы < > " \' & / # ?';
-          error.style.display = 'block';
-          return;
-        }
-        if (newDate === currentEditDate) {
-          showNotification('Дата не изменилась', 'info');
-          return;
-        }
-
-        const oldDate = currentEditDate;
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch(`/duty/dates/${encodeURIComponent(oldDate)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ new_date_str: newDate })
-          });
-          const data = await resp.json().catch(() => ({}));
-          if (!resp.ok) throw new Error(data.detail || 'Не удалось переименовать дату');
-
-          currentEditDate = data.date_str || newDate;
-          document.getElementById('edit-date-input').value = currentEditDate;
-          document.getElementById('edit-date-title').textContent = currentEditDate;
-          await refreshDutyData();
-          await refreshRepertoire();
-          renderEditDateRepertoire();
-          showNotification('Дата переименована', 'success');
-        } catch (e) {
-          error.textContent = e.message;
-          error.style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      }
-
-      async function saveEditDateDuties() {
-        const error = document.getElementById('edit-date-duty-error');
-        error.textContent = '';
-        error.style.display = 'none';
-        const entry = allDates.find(d => d.dateStr === currentEditDate);
-        if (!entry) return;
-
-        const selectedNames = editSelectedDutyIndices.map(index => entry.names[index]);
-        try {
-          showGlobalLoader();
-          for (let i = 0; i < entry.names.length; i++) {
-            const isSelected = selectedNames.includes(entry.names[i]);
-            if (entry.matrixRow[i] !== isSelected) {
-              await callToggleDuty(currentEditDate, entry.names[i], isSelected, true);
-            }
-          }
-          await refreshDutyData();
-          renderEditDateDutyList();
-          showNotification('Дежурные обновлены', 'success');
-        } catch (e) {
-          error.textContent = e.message;
-          error.style.display = 'block';
-        } finally {
-          hideGlobalLoader();
-        }
-      }
-
-      document.getElementById('edit-date-close').addEventListener('click', closeEditDateModal);
-      document.getElementById('edit-date-close-btn').addEventListener('click', closeEditDateModal);
-      document.getElementById('edit-date-modal').addEventListener('click', function (e) {
-        if (e.target === this) closeEditDateModal();
-      });
-      document.getElementById('edit-date-save').addEventListener('click', saveEditDateRename);
-      document.getElementById('edit-date-duty-save').addEventListener('click', saveEditDateDuties);
-      document.getElementById('edit-date-add-song').addEventListener('click', function () {
-        if (currentEditDate) openAddRepertoireSongModal(currentEditDate);
-      });
-      document.getElementById('edit-date-delete').addEventListener('click', function () {
-        deleteDate(currentEditDate);
-      });
-
-      async function handleTakeDuty(e) {
-        const btn = e.currentTarget;
-        const date = btn.dataset.date;
-        const action = btn.dataset.action; // 'add' или 'remove'
-        const user = currentUser;
-        if (!user) return;
-        const newValue = action === 'add';
-        try {
-          await callToggleDuty(date, user, newValue);
-          await refreshDutyData();
-        } catch (err) { }
-      }
-
-      async function callToggleDuty(dateStr, userName, newValue, silent = false) {
-        try {
-          if (!silent) showGlobalLoader();
-          const payload = {
-            date_str: dateStr,
-            user_name: userName,
-            value: newValue
-          };
-          // Кто вносит изменение, сервер теперь узнаёт из токена.
-          const resp = await apiFetch('/duty/toggle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const result = await resp.json();
-          if (!resp.ok) throw new Error(result.detail || 'Ошибка сохранения');
-          if (!silent) showNotification('Успешно обновлено', 'success');
-          return true;
-        } catch (e) {
-          showNotification('Ошибка: ' + e.message, 'error');
-          throw e;
-        } finally {
-          if (!silent) hideGlobalLoader();
-        }
-      }
-
-      async function refreshDutyData() {
-        const resp = await fetch(API_URL + '/duty/matrix');
-        if (!resp.ok) throw new Error('Ошибка загрузки графика');
-        const data = await resp.json();
-        const { dates, names, matrix } = data;
-        if (!dates || !names || !matrix) throw new Error('Некорректные данные');
-        allDates = dates.map((dateStr, i) => ({ dateStr, names, matrixRow: matrix[i] || [] }));
-        // Пересортировка
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        futureDates = [];
-        pastDates = [];
-        allDates.forEach(item => {
-          const d = parseDateDDMMYYYY(item.dateStr);
-          if (!d) {
-            futureDates.push(item);
-            return;
-          }
-          d.setHours(0, 0, 0, 0);
-          if (d < today) pastDates.push(item);
-          else futureDates.push(item);
-        });
-        futureDates.sort((a, b) => parseDateDDMMYYYY(a.dateStr) - parseDateDDMMYYYY(b.dateStr));
-        pastDates.sort((a, b) => parseDateDDMMYYYY(b.dateStr) - parseDateDDMMYYYY(a.dateStr));
-        renderMainCards();
-        renderArchiveTable();
-        updateCounts();
-      }
-
-      // ---------- Рендер архива ----------
-      function renderArchiveTable() {
-        const container = document.getElementById('archive-table-container');
-        if (pastDates.length === 0) {
-          container.innerHTML = '<p style="padding:20px; color:var(--text-muted);">Архив пуст.</p>';
-          return;
-        }
-        // Админу архив доступен на редактирование (только дежурные), остальным — только чтение.
-        container.innerHTML = buildCardsHTML(pastDates.map(withRepertoire), !isAdmin);
-        attachCardEvents();
-      }
-
-      // ---------- Построение HTML таблицы (без изменений) ----------
-      function buildTableHTML(items, isArchive) {
-        if (!items || items.length === 0) return '';
-        const names = items[0].names;
-        let html = `
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Дата</th>
-                  ${names.map(name => `<th>${escapeHtml(name)}</th>`).join('')}
-                </tr>
-              </thead>
-              <tbody>
-        `;
-
-        items.forEach(item => {
-          const dateStr = item.dateStr;
-          const row = item.matrixRow;
-          const checkedCount = row.filter(v => v === true).length;
-          const percent = Math.min((checkedCount / MAX_PER_DAY) * 100, 100);
-          const fillClass = checkedCount === MAX_PER_DAY ? 'full' : '';
-
-          html += `<tr data-date="${escapeHtml(dateStr)}">`;
-          html += `
-            <td>
-              <div class="date-cell">
-                <span class="date-text">${escapeHtml(formatDateDisplay(dateStr))}</span>
-                <div class="progress-wrapper">
-                  <span>${checkedCount}/${MAX_PER_DAY}</span>
-                  <div class="progress-bar">
-                    <div class="progress-fill ${fillClass}" style="width:${percent}%;"></div>
-                  </div>
-                </div>
-              </div>
-            </td>
-          `;
-          for (let j = 0; j < names.length; j++) {
-            const checked = row[j] === true;
-            const name = names[j];
-            let cellClass = 'cell';
-            if (isArchive) {
-              cellClass += ' archive-cell';
-            } else {
-              cellClass += checked ? ' selected' : '';
-            }
-            const display = checked ? '✔' : '•';
-            html += `
-              <td>
-                <span class="${cellClass}" 
-                      ${!isArchive ? `data-date="${escapeHtml(dateStr)}" data-name="${escapeHtml(name)}" data-checked="${checked}"` : ''}>
-                  ${display}
-                </span>
-              </td>
-            `;
-          }
-          html += '</tr>';
-        });
-
-        html += `</tbody></table></div>`;
-        return html;
-      }
-
-      // ---------- Счётчики ----------
-      function updateCounts() {
-        document.getElementById('main-count').textContent = `(${futureDates.length})`;
-        document.getElementById('archive-count').textContent = `(${pastDates.length})`;
-      }
-
-      // ---------- Обработчик клика по ячейке (новый эндпоинт) ----------
-      async function toggleCell(event) {
-        const cell = event.currentTarget;
-        if (cell.classList.contains('disabled') || cell.classList.contains('archive-cell')) return;
-
-        const date = cell.dataset.date;
-        const name = cell.dataset.name;
-        if (!currentUser) {
-          showNotification('Пожалуйста, войдите в систему.', 'warning');
-          return;
-        }
-        if (!isAdmin && currentUser !== name) {
-          showNotification('Вы можете изменять только свои ячейки.', 'warning');
-          return;
-        }
-
-        const currentChecked = cell.dataset.checked === 'true';
-        const newValue = !currentChecked;
-        let confirmMessage = currentChecked
-          ? `Вы уверены, что хотите снять ${name} с ${date}?`
-          : `Вы уверены, что хотите назначить ${name} на ${date}?`;
-        if (!confirm(confirmMessage)) return;
-
-        showGlobalLoader();
-        try {
-          const payload = {
-            date_str: date,
-            user_name: name,
-            value: newValue
-          };
-          // Кто вносит изменение, сервер теперь узнаёт из токена.
-          const resp = await apiFetch('/duty/toggle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const result = await resp.json();
-          if (!resp.ok) throw new Error(result.detail || 'Ошибка сохранения');
-          showNotification('Успешно обновлено', 'success');
-          await refreshDutyData();
-        } catch (e) {
-          showNotification('Ошибка сохранения: ' + e.message, 'error');
-          console.error(e);
-        } finally {
-          hideGlobalLoader();
-        }
-      }
-
-      // ---------- Статистика (без изменений) ----------
-      function renderStats() {
-        const section = document.getElementById('stats-section');
-        const container = document.getElementById('stats-container');
-        const canvas = document.getElementById('chartCanvas');
-
-        if (!allDates.length || !pastDates.length) {
-          section.style.display = 'none';
-          return;
-        }
-
-        const names = pastDates[0].names;
-        const totals = {};
-        names.forEach(name => totals[name] = 0);
-
-        pastDates.forEach(item => {
-          const row = item.matrixRow;
-          for (let i = 0; i < names.length; i++) {
-            if (row[i] === true) totals[names[i]]++;
-          }
-        });
-
-        const maxVal = Math.max(...Object.values(totals));
-        const maxName = Object.keys(totals).find(k => totals[k] === maxVal);
-
-        let html = `
-          <div class="stats-card stats-total">
-            <div class="name">🏆 Максимум</div>
-            <span class="value">${maxVal}</span>
-            <div class="label">${escapeHtml(maxName)}</div>
-          </div>
-        `;
-
-        names.forEach(name => {
-          const count = totals[name] || 0;
-          const percent = maxVal > 0 ? (count / maxVal) * 100 : 0;
-          let colorClass = '';
-          if (percent >= 80) colorClass = 'green';
-          else if (percent >= 50) colorClass = 'yellow';
-          html += `
-            <div class="stats-card">
-              <div class="name">${escapeHtml(name)}</div>
-              <span class="value">${count}</span>
-              <div class="label">дежурств</div>
-              <div class="progress-bar">
-                <div class="progress-fill-stat ${colorClass}" style="width:${percent}%;"></div>
-              </div>
-            </div>
-          `;
-        });
-
-        container.innerHTML = html;
-        section.style.display = 'block';
-        document.getElementById('stats-count').textContent = `(${names.length} чел.)`;
-        drawPieChart(canvas, names, totals);
-      }
-
-      // ---------- Круговая диаграмма (без изменений) ----------
-      function drawPieChart(canvas, labels, data) {
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const values = labels.map(name => data[name] || 0);
-        const total = values.reduce((a, b) => a + b, 0);
-
-        const container = canvas.parentElement;
-        const containerWidth = container.clientWidth || 400;
-        const size = Math.min(containerWidth, 400);
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = size * dpr;
-        canvas.height = size * dpr;
-        canvas.style.width = size + 'px';
-        canvas.style.height = size + 'px';
-        ctx.scale(dpr, dpr);
-
-        const cx = size / 2;
-        const cy = size / 2;
-        const radius = Math.min(size * 0.38, 180);
-
-        ctx.clearRect(0, 0, size, size);
-
-        if (total === 0) {
-          ctx.fillStyle = '#64748b';
-          ctx.font = '16px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('Нет дежурств', cx, cy);
-          return;
-        }
-
-        const colors = [
-          '#4f46e5', '#22c55e', '#eab308', '#ef4444', '#8b5cf6',
-          '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
-          '#06b6d4', '#d946ef', '#f59e0b', '#10b981', '#3b82f6'
-        ];
-
-        let startAngle = -Math.PI / 2;
-        const legendItems = [];
-
-        for (let i = 0; i < labels.length; i++) {
-          const val = values[i];
-          if (val === 0) continue;
-          const sliceAngle = (val / total) * 2 * Math.PI;
-          const endAngle = startAngle + sliceAngle;
-          const color = colors[i % colors.length];
-
-          ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.arc(cx, cy, radius, startAngle, endAngle);
-          ctx.closePath();
-          ctx.fillStyle = color;
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-
-          const percent = ((val / total) * 100).toFixed(1);
-          const midAngle = startAngle + sliceAngle / 2;
-          const labelRadius = radius * 0.7;
-          const x = cx + Math.cos(midAngle) * labelRadius;
-          const y = cy + Math.sin(midAngle) * labelRadius;
-          ctx.fillStyle = '#1e293b';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(percent + '%', x, y);
-
-          legendItems.push({ label: labels[i], color, value: val, percent });
-          startAngle = endAngle;
-        }
-
-        const legendContainer = document.getElementById('chart-container');
-        let legendHTML = '<div class="legend">';
-        legendItems.forEach(item => {
-          legendHTML += `
-            <div class="legend-item">
-              <span class="legend-color" style="background:${escapeHtml(item.color)};"></span>
-              ${escapeHtml(item.label)} (${item.value} — ${item.percent}%)
-            </div>
-          `;
-        });
-        legendHTML += '</div>';
-        const oldLegend = legendContainer.querySelector('.legend');
-        if (oldLegend) oldLegend.remove();
-        legendContainer.appendChild(createElementFromHTML(legendHTML));
-      }
-
-      function createElementFromHTML(htmlString) {
-        const div = document.createElement('div');
-        div.innerHTML = htmlString.trim();
-        return div.firstElementChild;
-      }
-
-      // ---------- Репертуар внутри карточек графика ----------
-      function addSongToDateHandler(e) {
-        const date = this.dataset.date;
-        openAddRepertoireSongModal(date);
-      }
-
-      function openViewSongModalHandler(e) {
-        const songName = this.dataset.song;
-        openViewSongModal(songName);
-      }
-
-      // ---- Новые обработчики для репертуара (используют новые эндпоинты) ----
-      async function deleteRepertoireSongHandler(e) {
-        const date = this.dataset.date;
-        const songName = this.dataset.song;
-        if (!confirm(`Удалить песню "${songName}" с даты ${date}?`)) return;
-        try {
-          showGlobalLoader();
-          const entry = repertoireData[date];
-          if (!entry) throw new Error('Дата не найдена');
-          const currentSongs = entry.songs || [];
-          const currentSongNames = currentSongs.map(s => typeof s === 'string' ? s : s.name);
-          const newSongs = currentSongNames.filter(name => name !== songName);
-          await setRepertoireSongs(date, newSongs);
-          await refreshRepertoire();
-          showNotification('Песня удалена из репертуара', 'success');
-        } catch (e) {
-          showNotification('Ошибка: ' + e.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      }
-
-      async function moveSongUpHandler(e) {
-        const date = this.dataset.date;
-        const songName = this.dataset.song;
-        const entry = repertoireData[date];
-        if (!entry) return;
-        const songs = entry.songs || [];
-        const songNames = songs.map(s => typeof s === 'string' ? s : s.name);
-        const index = songNames.indexOf(songName);
-        if (index <= 0) return;
-        const newSongNames = [...songNames];
-        [newSongNames[index], newSongNames[index - 1]] = [newSongNames[index - 1], newSongNames[index]];
-        try {
-          showGlobalLoader();
-          await setRepertoireSongs(date, newSongNames);
-          await refreshRepertoire();
-        } catch (e) {
-          showNotification('Ошибка изменения порядка: ' + e.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      }
-
-      async function moveSongDownHandler(e) {
-        const date = this.dataset.date;
-        const songName = this.dataset.song;
-        const entry = repertoireData[date];
-        if (!entry) return;
-        const songs = entry.songs || [];
-        const songNames = songs.map(s => typeof s === 'string' ? s : s.name);
-        const index = songNames.indexOf(songName);
-        if (index === -1 || index >= songNames.length - 1) return;
-        const newSongNames = [...songNames];
-        [newSongNames[index], newSongNames[index + 1]] = [newSongNames[index + 1], newSongNames[index]];
-        try {
-          showGlobalLoader();
-          await setRepertoireSongs(date, newSongNames);
-          await refreshRepertoire();
-        } catch (e) {
-          showNotification('Ошибка изменения порядка: ' + e.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      }
-
-      // ---------- Построение HTML репертуара внутри карточки даты ----------
-      function buildRepertoireSectionHTML(items, isArchive = false) {
-        if (!items || items.length === 0) return '';
-        const canEdit = !isArchive && isAdmin;
-        let html = '';
-
-        items.forEach(item => {
-          const dateStr = item.dateStr;
-          const songs = item.songs || [];
-          const colors = item.colors || [];
-
-          html += `
-            <div class="card-repertoire" data-date="${escapeHtml(dateStr)}">
-              <button type="button" class="repertoire-toggle" data-date="${escapeHtml(dateStr)}" aria-expanded="false">
-                <span class="repertoire-toggle-label">🎵 Песни${songs.length ? ` <span class="repertoire-count">${songs.length}</span>` : ''}</span>
-                <span class="repertoire-toggle-icon" aria-hidden="true">▾</span>
-              </button>
-              <div class="repertoire-panel">
-                <div class="repertoire-songs">
-                  ${songs.length ? songs.map(song => `
-                    <div class="repertoire-song-item">
-                      <span class="song-name ${song.text ? 'has-text' : ''}" data-song="${escapeHtml(song.name)}">• ${escapeHtml(song.name)}</span>
-                      <div class="song-actions">
-                        ${canEdit ? `
-                          <button class="move-song-up-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Переместить вверх">↑</button>
-                          <button class="move-song-down-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Переместить вниз">↓</button>
-                          <button class="delete-repertoire-song-btn" data-date="${escapeHtml(dateStr)}" data-song="${escapeHtml(song.name)}" title="Удалить песню">✖</button>
-                        ` : ''}
-                      </div>
-                    </div>
-                  `).join('') : '<div class="repertoire-empty">—</div>'}
-                </div>
-                ${colors.length ? `
-                  <div class="repertoire-colors">
-                    <div class="repertoire-section-title">🎨 Цвета</div>
-                    ${colors.map(c => `
-                      <span class="repertoire-color-item">
-                        <span class="color-dot" style="background:${escapeHtml(c.toLowerCase())}"></span>
-                        ${escapeHtml(c)}
-                      </span>
-                    `).join('')}
-                  </div>
-                ` : ''}
-                ${canEdit ? `<button class="add-song-to-date-btn" data-date="${escapeHtml(dateStr)}">+ Добавить песню</button>` : ''}
-              </div>
-            </div>
-          `;
-        });
-
-        return html;
-      }
-
-      function openViewSongModal(songName) {
-        const modal = document.getElementById('view-song-text-modal');
-        const nameDisplay = document.getElementById('view-song-name-display');
-        const content = document.getElementById('view-song-text-content');
-        const error = document.getElementById('view-song-text-error');
-        error.style.display = 'none';
-
-        const song = allSongs.find(s => s.name === songName);
-        if (!song || !song.text) {
-          showNotification('Текст не найден', 'warning');
-          return;
-        }
-
-        nameDisplay.textContent = songName;
-        content.textContent = song.text;
-        modal.style.display = 'flex';
-        document.getElementById('view-song-copy-btn').dataset.text = song.text;
-      }
-
-      // Закрытие модалки
-      document.getElementById('view-song-modal-close').addEventListener('click', () => {
-        document.getElementById('view-song-text-modal').style.display = 'none';
-      });
-      document.getElementById('view-song-modal-close-btn').addEventListener('click', () => {
-        document.getElementById('view-song-text-modal').style.display = 'none';
-      });
-      document.getElementById('view-song-text-modal').addEventListener('click', function (e) {
-        if (e.target === this) {
-          this.style.display = 'none';
-        }
-      });
-
-      // Копирование текста
-      document.getElementById('view-song-copy-btn').addEventListener('click', function () {
-        const text = this.dataset.text;
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-          showNotification('Текст скопирован', 'success');
-          document.getElementById('view-song-text-modal').style.display = 'none';
-        }).catch(() => {
-          showNotification('Не удалось скопировать текст', 'error');
-        });
-      });
-
-      document.getElementById('admin-sync-history-btn').addEventListener('click', async function () {
-        if (!isAdmin) return;
-        try {
-          showGlobalLoader();
-          const resp = await apiFetch('/sync/history');
-          const data = await resp.json();
-          if (!resp.ok) throw new Error(data.detail || 'Ошибка');
-          const container = document.getElementById('sync-history-list');
-          if (data.length === 0) {
-            container.innerHTML = '<p style="color:var(--text-muted);">История синхронизаций пуста.</p>';
-          } else {
-            let html = `<table style="width:100%; border-collapse:collapse;">
-                <thead><tr>
-                    <th style="text-align:left; padding:8px;">Дата</th>
-                    <th style="text-align:left; padding:8px;">Кто</th>
-                    <th style="text-align:left; padding:8px;">Статус</th>
-                    <th style="text-align:left; padding:8px;">Что изменилось</th>
-                    <th style="text-align:left; padding:8px;">Результат</th>
-                </tr></thead><tbody>`;
-            data.forEach(row => {
-              const statusColor = row.status === 'success' ? 'green' : row.status === 'error' ? 'red' : 'orange';
-              const statusLabel = { success: '✅ success', error: '❌ error', pending: '⏳ pending' }[row.status] || row.status;
-              const changed = escapeHtml(row.changes_summary || '—').replace(/\n/g, '<br>');
-              html += `<tr>
-                    <td style="padding:8px; white-space:nowrap;">${escapeHtml(formatDateTime(row.started_at))}</td>
-                    <td style="padding:8px;">${escapeHtml(row.triggered_by || 'auto')}</td>
-                    <td style="padding:8px; color:${statusColor};">${escapeHtml(statusLabel)}</td>
-                    <td style="padding:8px; vertical-align:top;">${changed}</td>
-                    <td style="padding:8px; vertical-align:top;">${escapeHtml(row.details || '—')}</td>
-                </tr>`;
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-          }
-          document.getElementById('sync-history-modal').style.display = 'flex';
-        } catch (e) {
-          showNotification('Ошибка загрузки истории: ' + e.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      });
-
-      document.getElementById('sync-history-close').addEventListener('click', () => {
-        document.getElementById('sync-history-modal').style.display = 'none';
-      });
-
-      // Запуск
-      loadData();
-    </script>
+  </div>
+<!--PART4-->
+  <script src="config.js?v=2.0"></script>
+  <script src="app.js?v=2.0"></script>
 </body>
 
 </html>
