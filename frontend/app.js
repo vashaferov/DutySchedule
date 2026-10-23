@@ -968,25 +968,14 @@ function renderSchedule() {
   if (countArchive) countArchive.textContent = String(archive.length);
   if (countMine) countMine.textContent = String(mine.length);
 
-  const lead = $('#schedule-lead');
-  if (lead) {
-    const uniqueSongs = new Set();
-    up.forEach((d) => d.songs.forEach((sid) => uniqueSongs.add(sid)));
-    lead.textContent = `${up.length} ${plural(up.length, ['актуальная дата', 'актуальные даты', 'актуальных дат'])} · ${uniqueSongs.size} ${plural(uniqueSongs.size, ['песня', 'песни', 'песен'])} в репертуаре`;
-  }
-  const periodEl = $('#schedule-period');
-  if (periodEl) periodEl.innerHTML = `<span class="status-dot"></span> ${esc(formatPeriod(up))}`;
-
   const view = $('#dates-view');
   const pagination = $('#dates-pagination');
   if (state.loading) {
-    if (lead) lead.textContent = 'Загрузка данных…';
     if (view) view.innerHTML = emptyState('sync', 'Загружаем график', 'Получаем даты, дежурных и репертуар.', '');
     if (pagination) pagination.innerHTML = '';
     return;
   }
   if (state.loadError) {
-    if (lead) lead.textContent = 'Не удалось загрузить данные';
     if (view) {
       view.innerHTML = emptyState('alert', 'Ошибка загрузки', state.loadError,
         `<button type="button" class="btn btn--primary" data-action="reload">${icon('sync')} Повторить</button>`);
