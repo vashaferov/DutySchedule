@@ -1486,6 +1486,7 @@ tbody tr:has(.cell.selected) td:first-child {
 .duty-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-items: start;
   gap: 16px;
   padding: 4px 0;
 }
@@ -1499,8 +1500,8 @@ tbody tr:has(.cell.selected) td:first-child {
   transition: transform 0.2s, box-shadow 0.2s;
   display: flex;
   flex-direction: column;
-  /* Одинаковый размер карточек в свёрнутом виде */
-  height: 250px;
+  /* В свёрнутом виде высота идёт по содержимому, без пустой зоны. */
+  height: auto;
 }
 
 /* Развёрнутый репертуар может увеличить карточку */
@@ -1571,7 +1572,7 @@ tbody tr:has(.cell.selected) td:first-child {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
 }
 
