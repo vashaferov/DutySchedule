@@ -52,6 +52,31 @@ def create_date(req: schemas.DutyDateCreateRequest,
     crud.set_sync_flag(db, True, user.name, f"добавлена дата {date_str}")
     return {"success": True, "date_str": date_str}
 
+@router.put("/dates/{date_str}")
+def rename_date(
+    date_str: str,
+    req: schemas.DutyDateRenameRequest,
+    user: models.User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    old_date_str = normalize_date_str(date_str)
+    new_date_str = normalize_date_str(req.new_date_str)
+    if not DATE_STR_RE.match(new_date_str):
+        raise HTTPException(
+            status_code=400,
+            detail='Формат даты: ДД.ММ.ГГГГ (пояснение в скобках). '
+                   'В пояснении нельзя символы < > " \' & / # ?',
+        )
+    try:
+        crud.rename_date(db, old_date_str, new_date_str)
+    except ValueError as e:
+        status_code = 404 if str(e) == "Дата не найдена" else 400
+        raise HTTPException(status_code=status_code, detail=str(e))
+
+    crud.set_sync_flag(db, True, user.name, f"переименована дата {old_date_str} → {new_date_str}")
+    return {"success": True, "old_date_str": old_date_str, "date_str": new_date_str}
+
+
 @router.delete("/dates/{date_str}")
 def delete_date(
     date_str: str,

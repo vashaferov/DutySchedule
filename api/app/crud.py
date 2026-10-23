@@ -48,6 +48,24 @@ def create_date(db: Session, date_str: str):
     db.refresh(date)
     return date
 
+def rename_date(db: Session, old_date_str: str, new_date_str: str):
+    """Переименовать дату, сохранив дежурных, репертуар и цвета."""
+    date = db.query(models.DutyDate).filter(models.DutyDate.date_str == old_date_str).first()
+    if not date:
+        raise ValueError("Дата не найдена")
+    if old_date_str == new_date_str:
+        return date
+
+    existing = db.query(models.DutyDate).filter(models.DutyDate.date_str == new_date_str).first()
+    if existing:
+        raise ValueError("Такая дата уже есть")
+
+    date.date_str = new_date_str
+    db.commit()
+    db.refresh(date)
+    return date
+
+
 def delete_date(db: Session, date_str: str):
     """Удалить дату вместе с дежурными, репертуаром и цветами.
 

@@ -1503,7 +1503,7 @@ tbody tr:has(.cell.selected) td:first-child {
   height: 250px;
 }
 
-/* Развёрнутые песни или выбор дежурных могут увеличить карточку */
+/* Развёрнутый репертуар может увеличить карточку */
 .duty-card.expanded {
   height: auto;
   min-height: 250px;
@@ -1549,7 +1549,7 @@ tbody tr:has(.cell.selected) td:first-child {
   flex-shrink: 0;
 }
 
-.btn-delete-date {
+.btn-edit-date {
   border: none;
   background: transparent;
   color: inherit;
@@ -1562,9 +1562,9 @@ tbody tr:has(.cell.selected) td:first-child {
   transition: opacity 0.15s, background 0.15s;
 }
 
-.btn-delete-date:hover {
+.btn-edit-date:hover {
   opacity: 1;
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(79, 70, 229, 0.15);
 }
 
 .duty-card-body {
@@ -1582,34 +1582,37 @@ tbody tr:has(.cell.selected) td:first-child {
 
 .duty-users {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 6px;
-  align-content: flex-start;
-  /* Фиксированная зона под дежурных: до двух строк */
-  height: 60px;
-  overflow-y: auto;
+  /* Ровно одна строка: дежурные и кнопка "Занять" */
+  height: 32px;
+  min-height: 32px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 
-.duty-action {
-  display: flex;
-  align-items: flex-start;
-  min-height: 34px;
-  flex-shrink: 0;
+.duty-users::-webkit-scrollbar {
+  display: none;
 }
 
 .duty-user {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 12px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
   font-weight: 500;
   background: var(--bg-cell);
   color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
   border: 1px solid transparent;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .duty-user.selected {
@@ -1628,17 +1631,18 @@ tbody tr:has(.cell.selected) td:first-child {
   pointer-events: none;
 }
 
-.btn-take-duty,
-.btn-assign-duty {
-  padding: 6px 14px;
+.duty-users .btn-take-duty {
+  padding: 3px 10px;
   border: none;
   border-radius: 8px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
-  font-size: 0.85rem;
-  margin-top: 4px;
-  align-self: flex-start;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  margin: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .btn-take-duty {
@@ -1649,12 +1653,17 @@ tbody tr:has(.cell.selected) td:first-child {
   background: #4338ca;
 }
 
-.btn-assign-duty {
-  background: #4f46e5;
-  color: #fff;
+.duty-users-note {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
-.btn-assign-duty:hover {
-  background: #4338ca;
+
+.duty-user.read-only {
+  cursor: default;
+  pointer-events: none;
 }
 
 /* ---------- Бейджики для выбора дежурных (админ) ---------- */
@@ -1690,10 +1699,145 @@ tbody tr:has(.cell.selected) td:first-child {
   background: var(--bg-cell-selected-hover);
 }
 
-.duty-editor .btn-primary,
-.duty-editor .btn-secondary {
+/* ---------- Модальное окно редактирования даты ---------- */
+#edit-date-modal {
+  /* Ниже окон добавления/просмотра песни, чтобы они открывались поверх */
+  z-index: 9998;
+}
+
+.edit-date-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.edit-date-section {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.edit-date-section:first-child {
+  padding-top: 0;
+}
+
+.edit-date-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.edit-date-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.edit-date-hint {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.edit-date-rename-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.edit-date-rename-row .modal-input {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.btn-compact {
+  padding: 8px 14px;
   font-size: 0.85rem;
-  padding: 4px 14px;
+  flex-shrink: 0;
+}
+
+#edit-date-duty-list {
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+#edit-date-duty-save {
+  margin-top: 10px;
+}
+
+.edit-date-repertoire {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.edit-date-song-item {
+  padding: 7px 0;
+  gap: 10px;
+}
+
+.edit-date-song-item .song-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-date-song-item .song-actions {
+  flex-shrink: 0;
+}
+
+.edit-date-song-item .song-actions button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.edit-date-empty {
+  padding: 6px 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.edit-date-danger-zone {
+  padding-top: 16px;
+}
+
+.btn-danger {
+  padding: 9px 16px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+@media (max-width: 560px) {
+  .edit-date-rename-row {
+    flex-direction: column;
+  }
+
+  .edit-date-rename-row .btn-compact {
+    width: 100%;
+  }
+
+  .edit-date-title {
+    display: block;
+    margin-top: 2px;
+  }
 }
 
 .song-name.has-text {

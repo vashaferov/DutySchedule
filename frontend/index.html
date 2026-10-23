@@ -240,6 +240,50 @@
       </div>
     </div>
 
+    <!-- Модальное окно редактирования даты (админ) -->
+    <div id="edit-date-modal" class="modal-overlay">
+      <div class="modal-content wide">
+        <div class="modal-header">
+          <h3>✏️ Редактирование даты <span id="edit-date-title" class="edit-date-title"></span></h3>
+          <button class="modal-close-btn" id="edit-date-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <section class="edit-date-section">
+            <div class="edit-date-section-title">Дата</div>
+            <div class="edit-date-rename-row">
+              <input type="text" id="edit-date-input" class="modal-input" autocomplete="off">
+              <button type="button" id="edit-date-save" class="btn-primary btn-compact">💾 Сохранить</button>
+            </div>
+            <div id="edit-date-error" class="modal-error"></div>
+          </section>
+
+          <section class="edit-date-section">
+            <div class="edit-date-section-title">
+              👥 Дежурные
+              <span class="edit-date-hint">до <span id="edit-date-max"></span></span>
+            </div>
+            <div id="edit-date-duty-list" class="duty-select-list"></div>
+            <div id="edit-date-duty-error" class="modal-error"></div>
+            <button type="button" id="edit-date-duty-save" class="btn-primary btn-compact">💾 Сохранить
+              дежурных</button>
+          </section>
+
+          <section class="edit-date-section">
+            <div class="edit-date-section-title">🎵 Репертуар</div>
+            <div id="edit-date-repertoire" class="edit-date-repertoire"></div>
+            <button type="button" id="edit-date-add-song" class="add-song-to-date-btn">+ Добавить песню</button>
+          </section>
+
+          <section class="edit-date-section edit-date-danger-zone">
+            <button type="button" id="edit-date-delete" class="btn-danger">🗑️ Удалить дату</button>
+          </section>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="edit-date-close-btn">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Модальное окно добавления песни в репертуар даты -->
     <div id="add-repertoire-song-modal" class="modal-overlay">
       <div class="modal-content small">
@@ -283,26 +327,6 @@
         <div class="modal-footer">
           <button class="btn-secondary" id="view-song-modal-close-btn">Закрыть</button>
           <button class="btn-primary" id="view-song-copy-btn">📋 Копировать текст</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Модальное окно выбора дежурного (админ) -->
-    <div id="assign-duty-modal" class="modal-overlay">
-      <div class="modal-content wide">
-        <div class="modal-header">
-          <h3>👥 Выбор дежурного на <span id="assign-duty-date"></span></h3>
-          <button class="modal-close-btn" id="assign-duty-modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <p style="color:var(--text-muted); margin-bottom:12px;">Выберите до <span id="assign-duty-max"></span>
-            дежурных</p>
-          <div id="assign-duty-user-list"></div>
-          <div id="assign-duty-error" class="modal-error"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" id="assign-duty-cancel">Отмена</button>
-          <button class="btn-primary" id="assign-duty-save">💾 Сохранить</button>
         </div>
       </div>
     </div>
@@ -1523,6 +1547,7 @@
         repertoireData = data;
         renderMainCards();
         renderArchiveTable();
+        if (isEditDateModalOpen()) renderEditDateRepertoire();
       }
 
       // ---------- Загрузка данных ----------
@@ -1671,7 +1696,7 @@
           <span class="duty-date" title="${escapeHtml(formatDateDisplay(dateStr))}">${escapeHtml(formatDateDisplay(dateStr))}</span>
           <span class="duty-card-header-right">
             <span class="duty-count">${checkedCount}/${MAX_PER_DAY}</span>
-            ${isAdmin ? '<button class="btn-delete-date" title="Удалить дату" aria-label="Удалить дату">🗑️</button>' : ''}
+            ${isAdmin ? `<button class="btn-edit-date" data-date="${escapeHtml(dateStr)}" title="Редактировать дату" aria-label="Редактировать дату">✏️</button>` : ''}
           </span>
         </div>
         <div class="duty-card-body">
@@ -1681,15 +1706,16 @@
             </div>
           </div>
           <div class="duty-users">
+            ${!isArchive ? getActionHTML(dateStr, row, names) : ''}
             ${assignedNames.map(name => {
             const isOwn = currentUser && name === currentUser;
             let cls = 'duty-user selected';
             if (isArchive) cls += ' disabled';
-            if (!isAdmin && !isOwn) cls += ' disabled';
+            if (isAdmin) cls += ' read-only';
+            else if (!isOwn) cls += ' disabled';
             return `<span class="${cls}" data-date="${escapeHtml(dateStr)}" data-name="${escapeHtml(name)}" data-checked="true">${escapeHtml(name)} ✔</span>`;
           }).join('')}
           </div>
-          <div class="duty-action">${!isArchive ? getActionHTML(dateStr, row, names) : ''}</div>
           ${buildRepertoireSectionHTML([{ dateStr, songs: item.songs || [], colors: item.colors || [] }], isArchive)}
         </div>
       </div>
@@ -1705,18 +1731,16 @@
         const currentUserIndex = names.indexOf(currentUser);
         const isUserSelected = currentUserIndex !== -1 && row[currentUserIndex] === true;
 
-        if (isAdmin) {
-          // Для администратора – кнопка, которая открывает выбор прямо в карточке
-          return `<button class="btn-assign-duty" data-date="${escapeHtml(dateStr)}">👥 Выбрать дежурного</button>`;
-        }
+        // Администратор назначает дежурных через модальное окно редактирования даты.
+        if (isAdmin) return '';
 
         if (currentUser) {
           if (isUserSelected) {
             return `<button class="btn-take-duty" data-date="${escapeHtml(dateStr)}" data-action="remove">❌ Отказаться</button>`;
           } else if (checkedCount < MAX_PER_DAY) {
-            return `<button class="btn-take-duty" data-date="${escapeHtml(dateStr)}" data-action="add">✅ Занять дату</button>`;
+            return `<button class="btn-take-duty" data-date="${escapeHtml(dateStr)}" data-action="add">✅ Занять</button>`;
           } else {
-            return `<span style="font-size:0.8rem; color:var(--text-muted);">⚠️ Мест нет</span>`;
+            return `<span class="duty-users-note">⚠️ Мест нет</span>`;
           }
         }
 
@@ -1724,28 +1748,23 @@
       }
 
       function attachCardEvents() {
-        // Обработка кликов по именам (только для админа) – можно убрать, т.к. теперь используем чекбоксы
-        document.querySelectorAll('.duty-user:not(.disabled)').forEach(el => {
+        // Обычный пользователь может снять только собственное дежурство.
+        // У администратора выбор дежурных перенесён в модальное окно.
+        document.querySelectorAll('.duty-user:not(.disabled):not(.read-only)').forEach(el => {
           el.removeEventListener('click', toggleCell);
           el.addEventListener('click', toggleCell);
         });
 
-        // Обработка кнопки "Занять дату" / "Отказаться"
+        // Обработка кнопки "Занять" / "Отказаться"
         document.querySelectorAll('.btn-take-duty').forEach(btn => {
           btn.removeEventListener('click', handleTakeDuty);
           btn.addEventListener('click', handleTakeDuty);
         });
 
-        // Обработка кнопки "Выбрать дежурного" (админ) – раскрытие выбора внутри карточки
-        document.querySelectorAll('.btn-assign-duty').forEach(btn => {
-          btn.removeEventListener('click', handleAssignDutyInline);
-          btn.addEventListener('click', handleAssignDutyInline);
-        });
-
-        // Удаление даты (только админ)
-        document.querySelectorAll('.btn-delete-date').forEach(btn => {
-          btn.removeEventListener('click', handleDeleteDate);
-          btn.addEventListener('click', handleDeleteDate);
+        // Редактирование даты (только админ)
+        document.querySelectorAll('.btn-edit-date').forEach(btn => {
+          btn.removeEventListener('click', handleEditDate);
+          btn.addEventListener('click', handleEditDate);
         });
 
         // Сворачивание/раскрытие песен в карточке
@@ -1760,20 +1779,22 @@
           el.addEventListener('click', openViewSongModalHandler);
         });
 
-        // Управление песнями на дате (только админ)
-        document.querySelectorAll('.delete-repertoire-song-btn').forEach(btn => {
+        // Управление песнями в карточках (только админ).
+        // Именно в карточках: такие же кнопки есть в модалке редактирования даты,
+        // и у них свои обработчики.
+        document.querySelectorAll('.card-repertoire .delete-repertoire-song-btn').forEach(btn => {
           btn.removeEventListener('click', deleteRepertoireSongHandler);
           btn.addEventListener('click', deleteRepertoireSongHandler);
         });
-        document.querySelectorAll('.move-song-up-btn').forEach(btn => {
+        document.querySelectorAll('.card-repertoire .move-song-up-btn').forEach(btn => {
           btn.removeEventListener('click', moveSongUpHandler);
           btn.addEventListener('click', moveSongUpHandler);
         });
-        document.querySelectorAll('.move-song-down-btn').forEach(btn => {
+        document.querySelectorAll('.card-repertoire .move-song-down-btn').forEach(btn => {
           btn.removeEventListener('click', moveSongDownHandler);
           btn.addEventListener('click', moveSongDownHandler);
         });
-        document.querySelectorAll('.add-song-to-date-btn').forEach(btn => {
+        document.querySelectorAll('.card-repertoire .add-song-to-date-btn').forEach(btn => {
           btn.removeEventListener('click', addSongToDateHandler);
           btn.addEventListener('click', addSongToDateHandler);
         });
@@ -1796,9 +1817,7 @@
 
       function syncDutyCardExpanded(card) {
         if (!card) return;
-        const hasOpenRepertoire = !!card.querySelector('.card-repertoire.open');
-        const hasEditor = !!card.querySelector('.duty-editor');
-        card.classList.toggle('expanded', hasOpenRepertoire || hasEditor);
+        card.classList.toggle('expanded', !!card.querySelector('.card-repertoire.open'));
       }
 
       function applyRepertoireExpansionState() {
@@ -1812,12 +1831,16 @@
         });
       }
 
-      async function handleDeleteDate(e) {
+      function handleEditDate(e) {
         e.stopPropagation();
         const btn = e.currentTarget;
-        // Дата берётся из самой карточки — та же строка, что используют остальные обработчики.
         const card = btn.closest('.duty-card');
-        const dateStr = card ? card.dataset.date : null;
+        const dateStr = btn.dataset.date || (card ? card.dataset.date : null);
+        if (!dateStr) return;
+        openEditDateModal(dateStr);
+      }
+
+      async function deleteDate(dateStr) {
         if (!dateStr) return;
 
         const entry = allDates.find(d => d.dateStr === dateStr);
@@ -1839,6 +1862,7 @@
           const data = await resp.json().catch(() => ({}));
           if (!resp.ok) throw new Error(data.detail || 'Не удалось удалить дату');
 
+          closeEditDateModal();
           await refreshDutyData();
           await refreshRepertoire();
           showNotification('Дата удалена', 'success');
@@ -1849,121 +1873,215 @@
         }
       }
 
-      function handleAssignDutyInline(e) {
-        const btn = e.currentTarget;
-        const card = btn.closest('.duty-card');
-        const date = btn.dataset.date;
-        const entry = allDates.find(d => d.dateStr === date);
-        if (!entry) return;
-        const names = entry.names;
-        const row = entry.matrixRow;
+      // ---------- Модальное окно редактирования даты ----------
+      let currentEditDate = '';
+      let editSelectedDutyIndices = [];
 
-        // Если уже открыт выбор – закрываем
-        const existingEditor = card.querySelector('.duty-editor');
-        if (existingEditor) {
-          existingEditor.remove();
-          btn.textContent = '👥 Выбрать дежурного';
-          syncDutyCardExpanded(card);
+      function isEditDateModalOpen() {
+        const modal = document.getElementById('edit-date-modal');
+        return !!modal && modal.style.display === 'flex';
+      }
+
+      function openEditDateModal(dateStr) {
+        if (!isAdmin) return;
+        const modal = document.getElementById('edit-date-modal');
+        const input = document.getElementById('edit-date-input');
+        const title = document.getElementById('edit-date-title');
+        const error = document.getElementById('edit-date-error');
+        const dutyError = document.getElementById('edit-date-duty-error');
+        currentEditDate = dateStr;
+        input.value = dateStr;
+        title.textContent = dateStr;
+        error.textContent = '';
+        error.style.display = 'none';
+        dutyError.textContent = '';
+        dutyError.style.display = 'none';
+        document.getElementById('edit-date-max').textContent = MAX_PER_DAY;
+        renderEditDateDutyList();
+        renderEditDateRepertoire();
+        modal.style.display = 'flex';
+      }
+
+      function closeEditDateModal() {
+        const modal = document.getElementById('edit-date-modal');
+        if (modal) modal.style.display = 'none';
+        currentEditDate = '';
+        editSelectedDutyIndices = [];
+      }
+
+      function renderEditDateDutyList() {
+        const list = document.getElementById('edit-date-duty-list');
+        if (!list || !currentEditDate) return;
+        const entry = allDates.find(d => d.dateStr === currentEditDate);
+        list.innerHTML = '';
+        editSelectedDutyIndices = [];
+        if (!entry || !entry.names.length) {
+          list.innerHTML = '<span class="edit-date-empty">Нет пользователей</span>';
           return;
         }
 
-        // Строим редактор
-        const editor = document.createElement('div');
-        editor.className = 'duty-editor';
-        editor.style.cssText = 'margin-top:8px; padding-top:8px; border-top:1px solid var(--border-color);';
+        editSelectedDutyIndices = entry.matrixRow
+          .map((value, index) => value ? index : -1)
+          .filter(index => index >= 0);
 
-        const title = document.createElement('div');
-        title.textContent = 'Выберите дежурных (до ' + MAX_PER_DAY + '):';
-        title.style.cssText = 'font-size:0.85rem; margin-bottom:6px; color:var(--text-secondary);';
-        editor.appendChild(title);
-
-        const list = document.createElement('div');
-        list.className = 'duty-select-list';
-        list.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px;';
-
-        const selectedIndices = row.map((v, i) => v ? i : -1).filter(i => i >= 0);
-        let currentSelected = [...selectedIndices];
-
-        names.forEach((name, idx) => {
+        entry.names.forEach((name, index) => {
           const item = document.createElement('span');
-          item.className = 'duty-select-item' + (currentSelected.includes(idx) ? ' selected' : '');
+          item.className = 'duty-select-item' + (editSelectedDutyIndices.includes(index) ? ' selected' : '');
           item.textContent = name;
-          item.dataset.idx = idx;
+          item.dataset.idx = index;
           item.addEventListener('click', function () {
-            const idx = parseInt(this.dataset.idx);
-            if (this.classList.contains('selected')) {
-              // Снимаем выбор
+            const idx = parseInt(this.dataset.idx, 10);
+            const selectedIdx = editSelectedDutyIndices.indexOf(idx);
+            if (selectedIdx >= 0) {
+              editSelectedDutyIndices.splice(selectedIdx, 1);
               this.classList.remove('selected');
-              currentSelected = currentSelected.filter(i => i !== idx);
-            } else {
-              // Проверяем лимит
-              if (currentSelected.length >= MAX_PER_DAY) {
-                showNotification(`Можно выбрать не более ${MAX_PER_DAY} дежурных`, 'warning');
-                return;
-              }
-              this.classList.add('selected');
-              currentSelected.push(idx);
+              return;
             }
+            if (editSelectedDutyIndices.length >= MAX_PER_DAY) {
+              showNotification(`Можно выбрать не более ${MAX_PER_DAY} дежурных`, 'warning');
+              return;
+            }
+            editSelectedDutyIndices.push(idx);
+            this.classList.add('selected');
           });
           list.appendChild(item);
         });
-
-        editor.appendChild(list);
-
-        const actions = document.createElement('div');
-        actions.style.cssText = 'display:flex; gap:8px; margin-top:8px;';
-
-        const saveBtn = document.createElement('button');
-        saveBtn.textContent = '💾 Сохранить';
-        saveBtn.className = 'btn-primary';
-        saveBtn.style.cssText = 'padding:4px 14px; font-size:0.85rem;';
-        saveBtn.addEventListener('click', async function () {
-          if (currentSelected.length > MAX_PER_DAY) {
-            showNotification(`Можно выбрать не более ${MAX_PER_DAY} дежурных`, 'warning');
-            return;
-          }
-          const selectedNames = currentSelected.map(idx => names[idx]);
-          try {
-            showGlobalLoader();
-            // Обновляем назначения
-            for (let i = 0; i < names.length; i++) {
-              const name = names[i];
-              const isSelected = selectedNames.includes(name);
-              const currentRow = allDates.find(d => d.dateStr === date).matrixRow;
-              if (currentRow[i] !== isSelected) {
-                await callToggleDuty(date, name, isSelected);
-              }
-            }
-            await refreshDutyData();
-            showNotification('Дежурные обновлены', 'success');
-            // Закрываем редактор
-            editor.remove();
-            btn.textContent = '👥 Выбрать дежурного';
-          } catch (e) {
-            showNotification('Ошибка: ' + e.message, 'error');
-          } finally {
-            hideGlobalLoader();
-          }
-        });
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.textContent = 'Отмена';
-        cancelBtn.className = 'btn-secondary';
-        cancelBtn.style.cssText = 'padding:4px 14px; font-size:0.85rem;';
-        cancelBtn.addEventListener('click', function () {
-          editor.remove();
-          btn.textContent = '👥 Выбрать дежурного';
-          syncDutyCardExpanded(card);
-        });
-
-        actions.appendChild(saveBtn);
-        actions.appendChild(cancelBtn);
-        editor.appendChild(actions);
-
-        card.querySelector('.duty-card-body').appendChild(editor);
-        btn.textContent = '❌ Закрыть выбор';
-        syncDutyCardExpanded(card);
       }
+
+      function renderEditDateRepertoire() {
+        const container = document.getElementById('edit-date-repertoire');
+        if (!container || !currentEditDate) return;
+        container.innerHTML = '';
+        const entry = repertoireData[currentEditDate];
+        const songs = entry && Array.isArray(entry.songs) ? entry.songs : [];
+
+        if (!songs.length) {
+          container.innerHTML = '<div class="edit-date-empty">Песен пока нет</div>';
+          return;
+        }
+
+        songs.forEach((song, index) => {
+          const songName = typeof song === 'string' ? song : song.name;
+          const songText = typeof song === 'string' ? '' : song.text;
+          const item = document.createElement('div');
+          item.className = 'repertoire-song-item edit-date-song-item';
+
+          const name = document.createElement('span');
+          name.className = 'song-name' + (songText ? ' has-text' : '');
+          name.textContent = '• ' + songName;
+          name.dataset.song = songName;
+          if (songText) name.addEventListener('click', openViewSongModalHandler);
+          item.appendChild(name);
+
+          const actions = document.createElement('div');
+          actions.className = 'song-actions';
+
+          const makeButton = (label, title, className, handler, disabled) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = label;
+            button.title = title;
+            button.className = className;
+            button.dataset.date = currentEditDate;
+            button.dataset.song = songName;
+            button.disabled = !!disabled;
+            button.addEventListener('click', handler);
+            actions.appendChild(button);
+          };
+
+          makeButton('↑', 'Переместить вверх', 'move-song-up-btn', moveSongUpHandler, index === 0);
+          makeButton('↓', 'Переместить вниз', 'move-song-down-btn', moveSongDownHandler, index === songs.length - 1);
+          makeButton('✖', 'Удалить песню', 'delete-repertoire-song-btn', deleteRepertoireSongHandler, false);
+
+          item.appendChild(actions);
+          container.appendChild(item);
+        });
+      }
+
+      async function saveEditDateRename() {
+        const input = document.getElementById('edit-date-input');
+        const error = document.getElementById('edit-date-error');
+        const newDate = input.value.trim().replace(/\s+/g, ' ');
+        error.textContent = '';
+        error.style.display = 'none';
+
+        const dateRe = /^\d{2}\.\d{2}\.\d{4}(\s*\([^<>"'`&\/#?]+\))?$/;
+        if (!dateRe.test(newDate)) {
+          error.textContent = 'Формат даты: ДД.ММ.ГГГГ (пояснение в скобках). В пояснении нельзя символы < > " \' & / # ?';
+          error.style.display = 'block';
+          return;
+        }
+        if (newDate === currentEditDate) {
+          showNotification('Дата не изменилась', 'info');
+          return;
+        }
+
+        const oldDate = currentEditDate;
+        try {
+          showGlobalLoader();
+          const resp = await apiFetch(`/duty/dates/${encodeURIComponent(oldDate)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_date_str: newDate })
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok) throw new Error(data.detail || 'Не удалось переименовать дату');
+
+          currentEditDate = data.date_str || newDate;
+          document.getElementById('edit-date-input').value = currentEditDate;
+          document.getElementById('edit-date-title').textContent = currentEditDate;
+          await refreshDutyData();
+          await refreshRepertoire();
+          renderEditDateRepertoire();
+          showNotification('Дата переименована', 'success');
+        } catch (e) {
+          error.textContent = e.message;
+          error.style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      }
+
+      async function saveEditDateDuties() {
+        const error = document.getElementById('edit-date-duty-error');
+        error.textContent = '';
+        error.style.display = 'none';
+        const entry = allDates.find(d => d.dateStr === currentEditDate);
+        if (!entry) return;
+
+        const selectedNames = editSelectedDutyIndices.map(index => entry.names[index]);
+        try {
+          showGlobalLoader();
+          for (let i = 0; i < entry.names.length; i++) {
+            const isSelected = selectedNames.includes(entry.names[i]);
+            if (entry.matrixRow[i] !== isSelected) {
+              await callToggleDuty(currentEditDate, entry.names[i], isSelected, true);
+            }
+          }
+          await refreshDutyData();
+          renderEditDateDutyList();
+          showNotification('Дежурные обновлены', 'success');
+        } catch (e) {
+          error.textContent = e.message;
+          error.style.display = 'block';
+        } finally {
+          hideGlobalLoader();
+        }
+      }
+
+      document.getElementById('edit-date-close').addEventListener('click', closeEditDateModal);
+      document.getElementById('edit-date-close-btn').addEventListener('click', closeEditDateModal);
+      document.getElementById('edit-date-modal').addEventListener('click', function (e) {
+        if (e.target === this) closeEditDateModal();
+      });
+      document.getElementById('edit-date-save').addEventListener('click', saveEditDateRename);
+      document.getElementById('edit-date-duty-save').addEventListener('click', saveEditDateDuties);
+      document.getElementById('edit-date-add-song').addEventListener('click', function () {
+        if (currentEditDate) openAddRepertoireSongModal(currentEditDate);
+      });
+      document.getElementById('edit-date-delete').addEventListener('click', function () {
+        deleteDate(currentEditDate);
+      });
 
       async function handleTakeDuty(e) {
         const btn = e.currentTarget;
@@ -1978,14 +2096,9 @@
         } catch (err) { }
       }
 
-      function handleAssignDuty(e) {
-        const date = e.currentTarget.dataset.date;
-        openAssignDutyModal(date);
-      }
-
-      async function callToggleDuty(dateStr, userName, newValue) {
+      async function callToggleDuty(dateStr, userName, newValue, silent = false) {
         try {
-          showGlobalLoader();
+          if (!silent) showGlobalLoader();
           const payload = {
             date_str: dateStr,
             user_name: userName,
@@ -1999,13 +2112,13 @@
           });
           const result = await resp.json();
           if (!resp.ok) throw new Error(result.detail || 'Ошибка сохранения');
-          showNotification('Успешно обновлено', 'success');
+          if (!silent) showNotification('Успешно обновлено', 'success');
           return true;
         } catch (e) {
           showNotification('Ошибка: ' + e.message, 'error');
           throw e;
         } finally {
-          hideGlobalLoader();
+          if (!silent) hideGlobalLoader();
         }
       }
 
@@ -2447,44 +2560,6 @@
 
         return html;
       }
-
-      let assignDate = '';
-      let assignUsers = [];
-      let assignSelected = [];
-
-      document.getElementById('assign-duty-modal-close').addEventListener('click', () => {
-        document.getElementById('assign-duty-modal').style.display = 'none';
-      });
-      document.getElementById('assign-duty-cancel').addEventListener('click', () => {
-        document.getElementById('assign-duty-modal').style.display = 'none';
-      });
-
-      document.getElementById('assign-duty-save').addEventListener('click', async function () {
-        if (assignSelected.length > MAX_PER_DAY) {
-          showNotification(`Можно выбрать не более ${MAX_PER_DAY} дежурных`, 'warning');
-          return;
-        }
-        try {
-          showGlobalLoader();
-          const selectedNames = assignSelected.map(idx => assignUsers[idx]);
-          // Обновляем назначения
-          for (let i = 0; i < assignUsers.length; i++) {
-            const name = assignUsers[i];
-            const isSelected = selectedNames.includes(name);
-            const currentRow = allDates.find(d => d.dateStr === assignDate).matrixRow;
-            if (currentRow[i] !== isSelected) {
-              await callToggleDuty(assignDate, name, isSelected);
-            }
-          }
-          document.getElementById('assign-duty-modal').style.display = 'none';
-          await refreshDutyData();
-          showNotification('Дежурные обновлены', 'success');
-        } catch (e) {
-          showNotification('Ошибка: ' + e.message, 'error');
-        } finally {
-          hideGlobalLoader();
-        }
-      });
 
       function openViewSongModal(songName) {
         const modal = document.getElementById('view-song-text-modal');

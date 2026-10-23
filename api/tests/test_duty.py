@@ -233,6 +233,131 @@ def test_clear_pending_changes(client, db, auth_headers, make_user):
     assert crud.get_pending_changes(db) == []
 
 
+def test_rename_date_by_admin(client, db, auth_headers, make_admin):
+    from urllib.parse import quote
+
+    make_admin("rename_admin")
+    headers = auth_headers("rename_admin")
+    old_date = "25.10.2030 (утро)"
+    new_date = "26.10.2030 (вечер)"
+    client.post("/api/duty/dates", json={"date_str": old_date}, headers=headers)
+
+    resp = client.put(
+        f"/api/duty/dates/{quote(old_date, safe='')}",
+        json={"new_date_str": "  26.10.2030   (вечер)  "},
+        headers=headers,
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["date_str"] == new_date
+    dates = client.get("/api/duty/matrix").json()["dates"]
+    assert old_date not in dates
+    assert new_date in dates
+
+
+def test_rename_date_keeps_duty_and_repertoire(client, db, auth_headers, make_user, make_admin):
+    from urllib.parse import quote
+
+    make_admin("rename_keep_admin")
+    make_user("rename_keep_user")
+    headers = auth_headers("rename_keep_admin")
+    old_date = "27.10.2030"
+    new_date = "28.10.2030"
+    client.post("/api/duty/dates", json={"date_str": old_date}, headers=headers)
+    client.post(
+        "/api/duty/toggle",
+        json={"date_str": old_date, "user_name": "rename_keep_user", "value": True},
+        headers=headers,
+    )
+    client.post("/api/songs/", json={"name": "Rename Song", "text": "text"}, headers=headers)
+    client.put(f"/api/repertoire/{old_date}", json={"songs": ["Rename Song"]}, headers=headers)
+
+    resp = client.put(
+        f"/api/duty/dates/{quote(old_date, safe='')}",
+        json={"new_date_str": new_date},
+        headers=headers,
+    )
+
+    assert resp.status_code == 200
+    matrix = client.get("/api/duty/matrix").json()
+    date_idx = matrix["dates"].index(new_date)
+    user_idx = matrix["names"].index("rename_keep_user")
+    assert matrix["matrix"][date_idx][user_idx] is True
+    repertoire = client.get("/api/repertoire/").json()
+    assert old_date not in repertoire
+    assert [s["name"] for s in repertoire[new_date]["songs"]] == ["Rename Song"]
+
+
+def test_rename_date_requires_admin(client, db, auth_headers, make_user, make_admin):
+    make_user("rename_plain")
+    make_admin("rename_forbid_admin")
+    old_date = "29.10.2030"
+    headers = auth_headers("rename_forbid_admin")
+    client.post("/api/duty/dates", json={"date_str": old_date}, headers=headers)
+
+    assert client.put(
+        f"/api/duty/dates/{old_date}",
+        json={"new_date_str": "30.10.2030"},
+    ).status_code == 401
+    resp = client.put(
+        f"/api/duty/dates/{old_date}",
+        json={"new_date_str": "30.10.2030"},
+        headers=auth_headers("rename_plain"),
+    )
+    assert resp.status_code == 403
+    assert old_date in client.get("/api/duty/matrix").json()["dates"]
+
+
+def test_rename_date_rejects_duplicate_and_unknown(client, db, auth_headers, make_admin):
+    make_admin("rename_duplicate_admin")
+    headers = auth_headers("rename_duplicate_admin")
+    client.post("/api/duty/dates", json={"date_str": "31.10.2030"}, headers=headers)
+    client.post("/api/duty/dates", json={"date_str": "01.11.2030"}, headers=headers)
+
+    duplicate = client.put(
+        "/api/duty/dates/31.10.2030",
+        json={"new_date_str": "01.11.2030"},
+        headers=headers,
+    )
+    assert duplicate.status_code == 400
+
+    unknown = client.put(
+        "/api/duty/dates/02.11.2030",
+        json={"new_date_str": "03.11.2030"},
+        headers=headers,
+    )
+    assert unknown.status_code == 404
+
+
+def test_rename_date_rejects_bad_format(client, db, auth_headers, make_admin):
+    make_admin("rename_bad_admin")
+    headers = auth_headers("rename_bad_admin")
+    client.post("/api/duty/dates", json={"date_str": "04.11.2030"}, headers=headers)
+
+    for new_date in ["04/11/2030", "05.11.2030 (<img src=x onerror=alert(1)>)", "05.11.2030 (а&б)"]:
+        resp = client.put(
+            "/api/duty/dates/04.11.2030",
+            json={"new_date_str": new_date},
+            headers=headers,
+        )
+        assert resp.status_code == 400, new_date
+
+
+def test_rename_date_records_change(client, db, auth_headers, make_admin):
+    make_admin("rename_log_admin")
+    headers = auth_headers("rename_log_admin")
+    old_date = "06.11.2030"
+    new_date = "07.11.2030"
+    client.post("/api/duty/dates", json={"date_str": old_date}, headers=headers)
+    crud.clear_pending_changes(db)
+
+    client.put(f"/api/duty/dates/{old_date}", json={"new_date_str": new_date}, headers=headers)
+
+    db.rollback()
+    changes = crud.get_pending_changes(db)
+    assert any(c["by"] == "rename_log_admin" and old_date in c["text"] and new_date in c["text"] for c in changes)
+
+
 def test_delete_date_by_admin(client, db, auth_headers, make_admin):
     make_admin("del_admin")
     headers = auth_headers("del_admin")

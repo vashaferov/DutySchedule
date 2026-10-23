@@ -47,6 +47,11 @@ class DutyDateCreateRequest(BaseModel):
     date_str: str
 
 
+class DutyDateRenameRequest(BaseModel):
+    # Новая дата в том же формате, что и при создании.
+    new_date_str: str
+
+
 class DutyMatrixResponse(BaseModel):
     dates: List[str]
     names: List[str]
